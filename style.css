@@ -146,6 +146,50 @@ body {
   margin-top: 0.4rem;
 }
 
+/* Context prompt */
+#scan-context-prompt {
+  padding: 0.75rem 1.5rem;
+  background: #f0f4ff;
+  border-bottom: 1px solid #e8e8e8;
+}
+
+#scan-context-prompt h3 {
+  color: #333;
+  font-size: 0.95rem;
+  margin-bottom: 0.3rem;
+}
+
+.optional-label {
+  font-weight: 400;
+  font-size: 0.75rem;
+  color: #999;
+}
+
+#scan-context-input {
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  border: 2px solid #e0e0e0;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-family: inherit;
+  margin-bottom: 0.5rem;
+  transition: border-color 0.2s;
+}
+
+#scan-context-input:focus {
+  outline: none;
+  border-color: #6C3CE1;
+}
+
+.scan-context-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.scan-context-actions button {
+  flex: 1;
+}
+
 /* Scan panel */
 #scan-panel {
   padding: 0.75rem 1.5rem;
