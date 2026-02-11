@@ -26,8 +26,8 @@ body {
 
 .sidebar-header {
   padding: 1.2rem 1.5rem;
-  background: linear-gradient(135deg, #6C3CE1, #E84393);
-  color: #fff;
+  background: linear-gradient(135deg, #F5C842, #FFD700);
+  color: #333;
 }
 
 .sidebar-header h1 {
