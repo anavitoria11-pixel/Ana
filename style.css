@@ -26,7 +26,7 @@ body {
 
 .sidebar-header {
   padding: 1.2rem 1.5rem;
-  background: linear-gradient(135deg, #4285f4, #34a853);
+  background: linear-gradient(135deg, #6C3CE1, #E84393);
   color: #fff;
 }
 
@@ -392,7 +392,7 @@ body {
 
 /* Buttons */
 button {
-  background: linear-gradient(135deg, #4285f4, #34a853);
+  background: linear-gradient(135deg, #6C3CE1, #E84393);
   color: #fff;
   border: none;
   padding: 0.55rem 1rem;
