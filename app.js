@@ -187,7 +187,7 @@ function selectGeoResult(lat, lng, displayName) {
 }
 
 // ============================================================
-// PHOTO UPLOAD - Extract GPS from EXIF data
+// IMAGE SCAN - OCR text extraction from screenshots/images
 // ============================================================
 
 function triggerPhotoUpload() {
@@ -198,64 +198,127 @@ document.getElementById('photo-input').addEventListener('change', function (e) {
   var file = e.target.files[0];
   if (!file) return;
 
-  var statusEl = document.getElementById('photo-status');
-  var statusText = document.getElementById('photo-status-text');
-  statusEl.classList.remove('hidden');
-  statusText.textContent = 'Reading photo EXIF data...';
+  var panel = document.getElementById('scan-panel');
+  var title = document.getElementById('scan-title');
+  var progressFill = document.getElementById('scan-progress-fill');
+  var resultsDiv = document.getElementById('scan-results');
 
-  // Read EXIF data using exif-js
-  var reader = new FileReader();
-  reader.onload = function (event) {
-    var img = document.createElement('img');
-    img.onload = function () {
-      EXIF.getData(img, function () {
-        var lat = EXIF.getTag(this, 'GPSLatitude');
-        var lng = EXIF.getTag(this, 'GPSLongitude');
-        var latRef = EXIF.getTag(this, 'GPSLatitudeRef');
-        var lngRef = EXIF.getTag(this, 'GPSLongitudeRef');
+  // Show panel, hide previous results
+  panel.classList.remove('hidden');
+  resultsDiv.classList.add('hidden');
+  title.textContent = 'Scanning image for text...';
+  progressFill.style.width = '10%';
+  document.getElementById('scan-progress').classList.remove('hidden');
 
-        if (lat && lng) {
-          var decLat = convertDMSToDD(lat[0], lat[1], lat[2], latRef);
-          var decLng = convertDMSToDD(lng[0], lng[1], lng[2], lngRef);
+  // Use Tesseract.js to extract text from image
+  Tesseract.recognize(file, 'eng+spa+fra+por+ita+deu', {
+    logger: function (m) {
+      if (m.status === 'recognizing text' && m.progress) {
+        progressFill.style.width = Math.round(10 + m.progress * 85) + '%';
+      }
+    }
+  }).then(function (result) {
+    progressFill.style.width = '100%';
+    var text = result.data.text || '';
 
-          statusText.textContent = 'Location found in photo! Placing on map...';
+    if (!text.trim()) {
+      title.textContent = 'No text found in this image.';
+      setTimeout(function () {
+        document.getElementById('scan-progress').classList.add('hidden');
+      }, 1000);
+      return;
+    }
 
-          pendingLatLng = { lat: decLat, lng: decLng };
+    title.textContent = 'Text found! Pick a place to search:';
+    document.getElementById('scan-progress').classList.add('hidden');
+    resultsDiv.classList.remove('hidden');
 
-          if (tempMarker) {
-            map.removeLayer(tempMarker);
-          }
-          tempMarker = L.marker([decLat, decLng], {
-            icon: createIcon('#999'),
-            opacity: 0.7,
-          }).addTo(map);
+    // Split text into lines, filter out short/empty ones
+    var lines = text.split('\n')
+      .map(function (l) { return l.trim(); })
+      .filter(function (l) { return l.length > 2; });
 
-          map.setView([decLat, decLng], 16);
+    var linesDiv = document.getElementById('scan-lines');
+    linesDiv.innerHTML = '';
 
-          showForm(file.name.replace(/\.[^/.]+$/, ''));
-          reverseGeocodeForForm(decLat, decLng);
+    // Pre-fill the search input with the best guess (longest meaningful line)
+    var bestLine = lines.reduce(function (best, line) {
+      return line.length > best.length ? line : best;
+    }, '');
+    document.getElementById('scan-search-input').value = bestLine;
 
-          setTimeout(function () { statusEl.classList.add('hidden'); }, 2000);
-        } else {
-          statusText.textContent = 'No GPS data found in this photo. Try a photo taken with location enabled, or use "Find Place" instead.';
-          setTimeout(function () { statusEl.classList.add('hidden'); }, 4000);
-        }
-      });
-    };
-    img.src = event.target.result;
-  };
-  reader.readAsDataURL(file);
+    lines.forEach(function (line) {
+      var div = document.createElement('div');
+      div.className = 'scan-line';
+      div.textContent = line;
+      div.onclick = function () {
+        document.getElementById('scan-search-input').value = line;
+        document.getElementById('scan-search-input').focus();
+      };
+      linesDiv.appendChild(div);
+    });
 
-  // Reset input so same file can be re-selected
+    document.getElementById('scan-geo-results').innerHTML = '';
+  }).catch(function () {
+    title.textContent = 'Failed to scan image. Try a clearer screenshot.';
+    document.getElementById('scan-progress').classList.add('hidden');
+  });
+
+  // Reset so same file can be re-selected
   e.target.value = '';
 });
 
-function convertDMSToDD(degrees, minutes, seconds, direction) {
-  var dd = degrees + minutes / 60 + seconds / 3600;
-  if (direction === 'S' || direction === 'W') {
-    dd = dd * -1;
+// Search from the scan panel
+function scanGeoSearch() {
+  var query = document.getElementById('scan-search-input').value.trim();
+  if (!query) return;
+
+  var resultsDiv = document.getElementById('scan-geo-results');
+  resultsDiv.innerHTML = '<div class="loading">Searching...</div>';
+
+  fetch('https://nominatim.openstreetmap.org/search?format=json&limit=6&q=' + encodeURIComponent(query))
+    .then(function (res) { return res.json(); })
+    .then(function (data) {
+      resultsDiv.innerHTML = '';
+      if (data.length === 0) {
+        resultsDiv.innerHTML = '<div class="loading">No results. Try editing the text above.</div>';
+        return;
+      }
+
+      data.forEach(function (item) {
+        var div = document.createElement('div');
+        div.className = 'geo-result-item';
+
+        var nameParts = item.display_name.split(',');
+        var name = nameParts[0];
+        var address = nameParts.slice(1, 4).join(',').trim();
+
+        div.innerHTML = '<div class="result-name">' + escapeHTML(name) + '</div>'
+          + '<div class="result-address">' + escapeHTML(address) + '</div>';
+
+        div.onclick = function () {
+          closeScanPanel();
+          selectGeoResult(parseFloat(item.lat), parseFloat(item.lon), item.display_name);
+        };
+
+        resultsDiv.appendChild(div);
+      });
+    })
+    .catch(function () {
+      resultsDiv.innerHTML = '<div class="loading">Search failed. Check your connection.</div>';
+    });
+}
+
+// Enter key in scan search
+document.getElementById('scan-search-input').addEventListener('keydown', function (e) {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    scanGeoSearch();
   }
-  return dd;
+});
+
+function closeScanPanel() {
+  document.getElementById('scan-panel').classList.add('hidden');
 }
 
 // ============================================================

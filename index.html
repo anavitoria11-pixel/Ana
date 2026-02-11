@@ -21,8 +21,8 @@
         <button onclick="showTextSearch()" class="add-btn" title="Search for a place">
           <span class="add-icon">&#128269;</span> Find Place
         </button>
-        <button onclick="triggerPhotoUpload()" class="add-btn" title="Add from photo">
-          <span class="add-icon">&#128247;</span> From Photo
+        <button onclick="triggerPhotoUpload()" class="add-btn" title="Scan screenshot for places">
+          <span class="add-icon">&#128247;</span> Scan Image
         </button>
       </div>
       <input type="file" id="photo-input" accept="image/*" class="hidden">
@@ -39,9 +39,22 @@
       <button class="secondary small-btn" onclick="closeTextSearch()">Cancel</button>
     </div>
 
-    <!-- Photo Status -->
-    <div id="photo-status" class="hidden">
-      <p id="photo-status-text"></p>
+    <!-- Scan Panel - shows OCR results from screenshot -->
+    <div id="scan-panel" class="hidden">
+      <h3 id="scan-title">Scanning image...</h3>
+      <div id="scan-progress" class="scan-progress-bar">
+        <div id="scan-progress-fill"></div>
+      </div>
+      <div id="scan-results" class="hidden">
+        <p class="scan-hint">We found text in your image. Edit the search below or tap a detected line to use it:</p>
+        <div id="scan-lines"></div>
+        <div class="search-row">
+          <input type="text" id="scan-search-input" placeholder="Place name to search...">
+          <button onclick="scanGeoSearch()">Find</button>
+        </div>
+        <div id="scan-geo-results"></div>
+      </div>
+      <button class="secondary small-btn" onclick="closeScanPanel()">Cancel</button>
     </div>
 
     <!-- Save Form -->
@@ -103,7 +116,7 @@
   <button id="sidebar-toggle" onclick="toggleSidebar()">&#9776;</button>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="https://unpkg.com/exif-js@2.3.0/exif.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
