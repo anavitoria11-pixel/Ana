@@ -190,7 +190,18 @@ function selectGeoResult(lat, lng, displayName) {
 // IMAGE SCAN - OCR + AI interpretation to extract places
 // ============================================================
 
+var userProvidedContext = '';
+
 function triggerPhotoUpload() {
+  // Show context prompt first
+  document.getElementById('scan-context-prompt').classList.remove('hidden');
+  document.getElementById('scan-context-input').value = '';
+  document.getElementById('scan-context-input').focus();
+}
+
+function startScanWithContext() {
+  userProvidedContext = document.getElementById('scan-context-input').value.trim();
+  document.getElementById('scan-context-prompt').classList.add('hidden');
   document.getElementById('photo-input').click();
 }
 
@@ -306,7 +317,14 @@ function extractPlaceCandidates(text) {
 
   // Detect location context from the full text
   var locationContexts = detectLocationContext(text);
-  var bestContext = locationContexts.length > 0 ? locationContexts[0] : '';
+
+  // User-provided context takes top priority
+  var bestContext = '';
+  if (userProvidedContext) {
+    bestContext = userProvidedContext;
+  } else if (locationContexts.length > 0) {
+    bestContext = locationContexts[0];
+  }
 
   var candidates = [];
   var seen = {};
@@ -769,6 +787,7 @@ document.getElementById('scan-search-input').addEventListener('keydown', functio
 
 function closeScanPanel() {
   document.getElementById('scan-panel').classList.add('hidden');
+  userProvidedContext = '';
 }
 
 // Toggle raw OCR text visibility

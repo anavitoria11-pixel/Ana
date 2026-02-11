@@ -39,6 +39,17 @@
       <button class="secondary small-btn" onclick="closeTextSearch()">Cancel</button>
     </div>
 
+    <!-- Context prompt before scan -->
+    <div id="scan-context-prompt" class="hidden">
+      <h3>Add context <span class="optional-label">(optional)</span></h3>
+      <p class="scan-hint">Where are these places? This helps find the right locations.</p>
+      <input type="text" id="scan-context-input" placeholder="e.g. Dublin, Tokyo, Brooklyn...">
+      <div class="scan-context-actions">
+        <button onclick="startScanWithContext()">Scan Image</button>
+        <button class="secondary" onclick="startScanWithContext()">Skip</button>
+      </div>
+    </div>
+
     <!-- Scan Panel - AI-powered place extraction from images -->
     <div id="scan-panel" class="hidden">
       <h3 id="scan-title">Scanning image...</h3>
