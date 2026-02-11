@@ -25,58 +25,185 @@ body {
 }
 
 .sidebar-header {
-  padding: 1.5rem;
+  padding: 1.2rem 1.5rem;
   background: linear-gradient(135deg, #4285f4, #34a853);
   color: #fff;
 }
 
 .sidebar-header h1 {
-  font-size: 1.5rem;
-  margin-bottom: 0.25rem;
+  font-size: 1.4rem;
+  margin-bottom: 0.2rem;
 }
 
 .sidebar-header .subtitle {
-  font-size: 0.85rem;
+  font-size: 0.8rem;
   opacity: 0.9;
 }
 
+/* Add methods buttons */
+#add-methods {
+  padding: 0.75rem 1.5rem;
+  border-bottom: 1px solid #e8e8e8;
+  background: #f8f9fa;
+}
+
+.add-methods-row {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.add-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 0.55rem 0.5rem;
+  font-size: 0.85rem;
+  border-radius: 8px;
+}
+
+.add-icon {
+  font-size: 1rem;
+}
+
+/* Text search panel */
+#text-search-panel {
+  padding: 0.75rem 1.5rem;
+  border-bottom: 1px solid #e8e8e8;
+  background: #f0f4ff;
+}
+
+#text-search-panel h3 {
+  color: #333;
+  font-size: 0.95rem;
+  margin-bottom: 0.5rem;
+}
+
+.search-row {
+  display: flex;
+  gap: 0.4rem;
+  margin-bottom: 0.5rem;
+}
+
+.search-row input {
+  flex: 1;
+  padding: 0.5rem 0.75rem;
+  border: 2px solid #e0e0e0;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-family: inherit;
+}
+
+.search-row input:focus {
+  outline: none;
+  border-color: #4285f4;
+}
+
+.search-row button {
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+
+#geo-results {
+  max-height: 180px;
+  overflow-y: auto;
+}
+
+.geo-result-item {
+  padding: 0.5rem 0.6rem;
+  cursor: pointer;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  color: #333;
+  transition: background 0.15s;
+  border-bottom: 1px solid #e8e8e8;
+}
+
+.geo-result-item:last-child {
+  border-bottom: none;
+}
+
+.geo-result-item:hover {
+  background: #e3ecff;
+}
+
+.geo-result-item .result-name {
+  font-weight: 600;
+}
+
+.geo-result-item .result-address {
+  font-size: 0.75rem;
+  color: #888;
+  margin-top: 0.1rem;
+}
+
+.small-btn {
+  font-size: 0.8rem;
+  padding: 0.35rem 0.75rem;
+  margin-top: 0.4rem;
+}
+
+/* Photo status */
+#photo-status {
+  padding: 0.6rem 1.5rem;
+  background: #fff8e1;
+  border-bottom: 1px solid #e8e8e8;
+}
+
+#photo-status p {
+  font-size: 0.85rem;
+  color: #666;
+}
+
 /* Form */
+.hidden {
+  display: none !important;
+}
+
 #place-form {
-  padding: 1rem 1.5rem;
+  padding: 0.75rem 1.5rem;
   border-bottom: 1px solid #e8e8e8;
   background: #f8f9fa;
 }
 
 #place-form h3 {
   color: #333;
-  margin-bottom: 0.75rem;
+  margin-bottom: 0.5rem;
   font-size: 1rem;
 }
 
-.hidden {
-  display: none !important;
+#form-location-preview {
+  background: #e8f0fe;
+  padding: 0.4rem 0.7rem;
+  border-radius: 6px;
+  margin-bottom: 0.5rem;
+  font-size: 0.8rem;
+  color: #4285f4;
 }
 
 .form-group {
-  margin-bottom: 0.75rem;
+  margin-bottom: 0.6rem;
 }
 
 .form-group label {
   display: block;
   font-weight: 600;
   color: #555;
-  margin-bottom: 0.3rem;
-  font-size: 0.85rem;
+  margin-bottom: 0.25rem;
+  font-size: 0.8rem;
 }
 
 .form-group input[type="text"],
 .form-group textarea,
 .form-group select {
   width: 100%;
-  padding: 0.5rem 0.75rem;
+  padding: 0.45rem 0.7rem;
   border: 2px solid #e0e0e0;
   border-radius: 8px;
-  font-size: 0.9rem;
+  font-size: 0.85rem;
   font-family: inherit;
   transition: border-color 0.2s;
 }
@@ -106,9 +233,9 @@ button {
   background: linear-gradient(135deg, #4285f4, #34a853);
   color: #fff;
   border: none;
-  padding: 0.6rem 1rem;
+  padding: 0.55rem 1rem;
   border-radius: 8px;
-  font-size: 0.9rem;
+  font-size: 0.85rem;
   cursor: pointer;
   transition: opacity 0.2s, transform 0.1s;
   font-family: inherit;
@@ -132,18 +259,18 @@ button.secondary:hover {
   background: #d8d8d8;
 }
 
-/* Search */
-#search-box {
-  padding: 0.75rem 1.5rem;
+/* Filter bar */
+#filter-bar {
+  padding: 0.6rem 1.5rem;
   border-bottom: 1px solid #e8e8e8;
 }
 
 #search-input {
   width: 100%;
-  padding: 0.5rem 0.75rem;
+  padding: 0.45rem 0.7rem;
   border: 2px solid #e0e0e0;
   border-radius: 8px;
-  font-size: 0.9rem;
+  font-size: 0.85rem;
   font-family: inherit;
   transition: border-color 0.2s;
 }
@@ -153,11 +280,45 @@ button.secondary:hover {
   border-color: #4285f4;
 }
 
+#tag-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin-top: 0.4rem;
+}
+
+#tag-filters:empty {
+  margin-top: 0;
+}
+
+.tag-filter-chip {
+  font-size: 0.7rem;
+  padding: 0.2rem 0.5rem;
+  border-radius: 10px;
+  cursor: pointer;
+  border: 1.5px solid #ccc;
+  background: #fff;
+  color: #666;
+  transition: all 0.15s;
+}
+
+.tag-filter-chip:hover {
+  border-color: #4285f4;
+  transform: none;
+  opacity: 1;
+}
+
+.tag-filter-chip.active {
+  background: #4285f4;
+  color: #fff;
+  border-color: #4285f4;
+}
+
 /* Places list */
 #places-list {
   flex: 1;
   overflow-y: auto;
-  padding: 0.5rem 0;
+  padding: 0;
 }
 
 .empty-msg {
@@ -168,14 +329,35 @@ button.secondary:hover {
   line-height: 1.5;
 }
 
+/* City group headers */
+.city-group-header {
+  padding: 0.5rem 1.5rem;
+  background: #f4f6f8;
+  font-weight: 700;
+  font-size: 0.8rem;
+  color: #555;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-bottom: 1px solid #e8e8e8;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.city-group-header .city-count {
+  font-weight: 400;
+  color: #999;
+  margin-left: 0.3rem;
+}
+
 .place-item {
-  padding: 0.75rem 1.5rem;
+  padding: 0.6rem 1.5rem;
   border-bottom: 1px solid #f0f0f0;
   cursor: pointer;
   transition: background 0.15s;
   display: flex;
   align-items: flex-start;
-  gap: 0.75rem;
+  gap: 0.6rem;
 }
 
 .place-item:hover {
@@ -198,7 +380,7 @@ button.secondary:hover {
 .place-item .place-name {
   font-weight: 600;
   color: #333;
-  font-size: 0.95rem;
+  font-size: 0.9rem;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -206,23 +388,39 @@ button.secondary:hover {
 
 .place-item .place-desc {
   color: #888;
-  font-size: 0.8rem;
-  margin-top: 0.15rem;
+  font-size: 0.75rem;
+  margin-top: 0.1rem;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
+.place-item .place-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  margin-top: 0.25rem;
+}
+
+.place-tag {
+  font-size: 0.65rem;
+  padding: 0.1rem 0.4rem;
+  border-radius: 8px;
+  background: #e8f0fe;
+  color: #4285f4;
+  font-weight: 500;
+}
+
 .place-item .place-coords {
   color: #aaa;
-  font-size: 0.75rem;
-  margin-top: 0.15rem;
+  font-size: 0.7rem;
+  margin-top: 0.1rem;
 }
 
 .place-item .delete-btn {
   background: none;
   color: #ccc;
-  font-size: 1.2rem;
+  font-size: 1.1rem;
   padding: 0;
   line-height: 1;
   flex-shrink: 0;
@@ -237,7 +435,7 @@ button.secondary:hover {
 
 /* Sidebar footer */
 .sidebar-footer {
-  padding: 0.75rem 1.5rem;
+  padding: 0.6rem 1.5rem;
   border-top: 1px solid #e8e8e8;
   display: flex;
   gap: 0.5rem;
@@ -245,8 +443,8 @@ button.secondary:hover {
 
 .sidebar-footer button {
   flex: 1;
-  font-size: 0.8rem;
-  padding: 0.5rem;
+  font-size: 0.75rem;
+  padding: 0.45rem;
 }
 
 /* Map */
@@ -309,19 +507,42 @@ button.secondary:hover {
   font-size: 0.7rem;
   color: #fff;
   font-weight: 600;
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.3rem;
+}
+
+.popup-content .popup-tags {
+  margin-bottom: 0.3rem;
+}
+
+.popup-content .popup-tags .place-tag {
+  font-size: 0.65rem;
+  margin-right: 0.2rem;
+}
+
+.popup-content .popup-city {
+  font-size: 0.7rem;
+  color: #999;
+  margin-bottom: 0.3rem;
 }
 
 .popup-content .popup-actions {
   display: flex;
   gap: 0.3rem;
-  margin-top: 0.5rem;
+  margin-top: 0.4rem;
 }
 
 .popup-content .popup-actions button {
   font-size: 0.75rem;
   padding: 0.3rem 0.6rem;
   border-radius: 6px;
+}
+
+/* Loading spinner */
+.loading {
+  text-align: center;
+  padding: 1rem;
+  color: #999;
+  font-size: 0.85rem;
 }
 
 /* Responsive */

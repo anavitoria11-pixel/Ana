@@ -12,18 +12,51 @@
   <aside id="sidebar">
     <div class="sidebar-header">
       <h1>My Places</h1>
-      <p class="subtitle">Click on the map to save a location</p>
+      <p class="subtitle">Click map, search a place, or upload a photo</p>
     </div>
 
+    <!-- Add Place Methods -->
+    <div id="add-methods">
+      <div class="add-methods-row">
+        <button onclick="showTextSearch()" class="add-btn" title="Search for a place">
+          <span class="add-icon">&#128269;</span> Find Place
+        </button>
+        <button onclick="triggerPhotoUpload()" class="add-btn" title="Add from photo">
+          <span class="add-icon">&#128247;</span> From Photo
+        </button>
+      </div>
+      <input type="file" id="photo-input" accept="image/*" class="hidden">
+    </div>
+
+    <!-- Text Search Panel -->
+    <div id="text-search-panel" class="hidden">
+      <h3>Find a place</h3>
+      <div class="search-row">
+        <input type="text" id="geo-search-input" placeholder="e.g. Eiffel Tower, Paris">
+        <button onclick="geoSearch()" id="geo-search-btn">Go</button>
+      </div>
+      <div id="geo-results"></div>
+      <button class="secondary small-btn" onclick="closeTextSearch()">Cancel</button>
+    </div>
+
+    <!-- Photo Status -->
+    <div id="photo-status" class="hidden">
+      <p id="photo-status-text"></p>
+    </div>
+
+    <!-- Save Form -->
     <div id="place-form" class="hidden">
       <h3 id="form-title">Save this place</h3>
+      <div id="form-location-preview" class="hidden">
+        <span id="form-location-name"></span>
+      </div>
       <div class="form-group">
         <label for="place-name">Name</label>
         <input type="text" id="place-name" placeholder="e.g. Favorite coffee shop">
       </div>
       <div class="form-group">
         <label for="place-desc">Description</label>
-        <textarea id="place-desc" rows="3" placeholder="Add a note about this place..."></textarea>
+        <textarea id="place-desc" rows="2" placeholder="Add a note about this place..."></textarea>
       </div>
       <div class="form-group">
         <label for="place-category">Category</label>
@@ -36,18 +69,25 @@
           <option value="home">Home</option>
         </select>
       </div>
+      <div class="form-group">
+        <label for="place-tags">Tags</label>
+        <input type="text" id="place-tags" placeholder="e.g. restaurant, italian, cozy (comma separated)">
+      </div>
       <div class="form-actions">
         <button id="btn-save" onclick="savePlace()">Save Place</button>
         <button id="btn-cancel" class="secondary" onclick="cancelForm()">Cancel</button>
       </div>
     </div>
 
-    <div id="search-box">
+    <!-- Filter bar -->
+    <div id="filter-bar">
       <input type="text" id="search-input" placeholder="Search saved places...">
+      <div id="tag-filters"></div>
     </div>
 
+    <!-- Places list grouped by city -->
     <div id="places-list">
-      <p id="empty-message" class="empty-msg">No saved places yet. Click on the map to add one!</p>
+      <p id="empty-message" class="empty-msg">No saved places yet.<br>Click the map, search a place, or upload a photo!</p>
     </div>
 
     <div class="sidebar-footer">
@@ -63,6 +103,7 @@
   <button id="sidebar-toggle" onclick="toggleSidebar()">&#9776;</button>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/exif-js@2.3.0/exif.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
