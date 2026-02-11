@@ -3,90 +3,66 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Interactive Quiz App</title>
+  <title>My Places - Map App</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <div class="container">
-    <h1>Interactive Quiz App</h1>
-
-    <!-- Mode Selection -->
-    <div id="menu" class="card">
-      <h2>What would you like to do?</h2>
-      <div class="menu-buttons">
-        <button onclick="showCreateMode()">Create a Quiz</button>
-        <button onclick="showTakeMode()" id="btn-take-quiz" disabled>Take the Quiz</button>
-      </div>
-      <p id="quiz-status" class="status-text"></p>
+  <!-- Sidebar -->
+  <aside id="sidebar">
+    <div class="sidebar-header">
+      <h1>My Places</h1>
+      <p class="subtitle">Click on the map to save a location</p>
     </div>
 
-    <!-- Quiz Creation -->
-    <div id="create-mode" class="card hidden">
-      <h2>Create Your Quiz</h2>
-      <p class="subtitle">Add questions with multiple-choice answers. Mark the correct one.</p>
-
+    <div id="place-form" class="hidden">
+      <h3 id="form-title">Save this place</h3>
       <div class="form-group">
-        <label for="question-input">Question</label>
-        <input type="text" id="question-input" placeholder="Type your question here...">
+        <label for="place-name">Name</label>
+        <input type="text" id="place-name" placeholder="e.g. Favorite coffee shop">
       </div>
-
-      <div id="options-container">
-        <label>Answer Options</label>
-        <div class="option-row">
-          <input type="radio" name="correct" value="0" checked>
-          <input type="text" class="option-input" placeholder="Option 1">
-        </div>
-        <div class="option-row">
-          <input type="radio" name="correct" value="1">
-          <input type="text" class="option-input" placeholder="Option 2">
-        </div>
-        <div class="option-row">
-          <input type="radio" name="correct" value="2">
-          <input type="text" class="option-input" placeholder="Option 3">
-        </div>
-        <div class="option-row">
-          <input type="radio" name="correct" value="3">
-          <input type="text" class="option-input" placeholder="Option 4">
-        </div>
+      <div class="form-group">
+        <label for="place-desc">Description</label>
+        <textarea id="place-desc" rows="3" placeholder="Add a note about this place..."></textarea>
       </div>
-      <p class="hint">Select the radio button next to the correct answer.</p>
-
+      <div class="form-group">
+        <label for="place-category">Category</label>
+        <select id="place-category">
+          <option value="default">General</option>
+          <option value="food">Food & Drink</option>
+          <option value="shop">Shopping</option>
+          <option value="nature">Nature</option>
+          <option value="work">Work</option>
+          <option value="home">Home</option>
+        </select>
+      </div>
       <div class="form-actions">
-        <button onclick="addQuestion()">Add Question</button>
-        <button onclick="finishCreating()" class="secondary">Done - Back to Menu</button>
-      </div>
-
-      <div id="questions-list" class="hidden">
-        <h3>Questions Added:</h3>
-        <ul id="questions-ul"></ul>
+        <button id="btn-save" onclick="savePlace()">Save Place</button>
+        <button id="btn-cancel" class="secondary" onclick="cancelForm()">Cancel</button>
       </div>
     </div>
 
-    <!-- Quiz Taking -->
-    <div id="take-mode" class="card hidden">
-      <div id="quiz-area">
-        <div class="progress-bar">
-          <div id="progress-fill"></div>
-        </div>
-        <p id="question-counter" class="subtitle"></p>
-        <h2 id="quiz-question"></h2>
-        <div id="quiz-options"></div>
-        <div id="feedback" class="hidden"></div>
-        <button id="next-btn" class="hidden" onclick="nextQuestion()">Next Question</button>
-      </div>
-
-      <div id="results-area" class="hidden">
-        <h2>Quiz Complete!</h2>
-        <div id="score-display"></div>
-        <div id="results-details"></div>
-        <div class="form-actions">
-          <button onclick="retakeQuiz()">Retake Quiz</button>
-          <button onclick="backToMenu()" class="secondary">Back to Menu</button>
-        </div>
-      </div>
+    <div id="search-box">
+      <input type="text" id="search-input" placeholder="Search saved places...">
     </div>
-  </div>
 
+    <div id="places-list">
+      <p id="empty-message" class="empty-msg">No saved places yet. Click on the map to add one!</p>
+    </div>
+
+    <div class="sidebar-footer">
+      <button class="secondary" onclick="exportPlaces()">Export JSON</button>
+      <button class="secondary" onclick="clearAllPlaces()">Clear All</button>
+    </div>
+  </aside>
+
+  <!-- Map -->
+  <div id="map"></div>
+
+  <!-- Mobile toggle -->
+  <button id="sidebar-toggle" onclick="toggleSidebar()">&#9776;</button>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

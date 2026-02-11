@@ -1,287 +1,305 @@
-// Quiz data
-let questions = [];
-let currentQuestionIndex = 0;
-let score = 0;
-let userAnswers = [];
+// --- Data ---
+let places = JSON.parse(localStorage.getItem('myPlaces') || '[]');
+let markers = {};
+let tempMarker = null;
+let pendingLatLng = null;
 
-// DOM references
-const menuEl = document.getElementById('menu');
-const createModeEl = document.getElementById('create-mode');
-const takeModeEl = document.getElementById('take-mode');
-const btnTakeQuiz = document.getElementById('btn-take-quiz');
-const quizStatus = document.getElementById('quiz-status');
-const questionInput = document.getElementById('question-input');
-const optionInputs = document.querySelectorAll('.option-input');
-const questionsList = document.getElementById('questions-list');
-const questionsUl = document.getElementById('questions-ul');
+// Category configuration
+const categories = {
+  default: { label: 'General', color: '#4285f4' },
+  food: { label: 'Food & Drink', color: '#ea4335' },
+  shop: { label: 'Shopping', color: '#fbbc04' },
+  nature: { label: 'Nature', color: '#34a853' },
+  work: { label: 'Work', color: '#9c27b0' },
+  home: { label: 'Home', color: '#ff6d00' },
+};
 
-// --- Navigation ---
+// --- Map Setup ---
+const map = L.map('map').setView([20, 0], 3);
 
-function showCreateMode() {
-  menuEl.classList.add('hidden');
-  createModeEl.classList.remove('hidden');
-  takeModeEl.classList.add('hidden');
-  questionInput.focus();
-}
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+  maxZoom: 19,
+}).addTo(map);
 
-function showTakeMode() {
-  if (questions.length === 0) return;
-  menuEl.classList.add('hidden');
-  createModeEl.classList.add('hidden');
-  takeModeEl.classList.remove('hidden');
-  startQuiz();
-}
-
-function backToMenu() {
-  menuEl.classList.remove('hidden');
-  createModeEl.classList.add('hidden');
-  takeModeEl.classList.add('hidden');
-  updateMenuStatus();
-}
-
-function finishCreating() {
-  clearForm();
-  backToMenu();
-}
-
-function updateMenuStatus() {
-  const count = questions.length;
-  if (count === 0) {
-    quizStatus.textContent = 'No questions yet. Create a quiz first!';
-    btnTakeQuiz.disabled = true;
-  } else {
-    quizStatus.textContent = `Quiz ready with ${count} question${count > 1 ? 's' : ''}.`;
-    btnTakeQuiz.disabled = false;
-  }
-}
-
-// --- Quiz Creation ---
-
-function addQuestion() {
-  const questionText = questionInput.value.trim();
-  if (!questionText) {
-    shakeElement(questionInput);
-    return;
-  }
-
-  const options = [];
-  let allFilled = true;
-  optionInputs.forEach((input) => {
-    const val = input.value.trim();
-    if (!val) allFilled = false;
-    options.push(val);
-  });
-
-  if (!allFilled) {
-    optionInputs.forEach((input) => {
-      if (!input.value.trim()) shakeElement(input);
-    });
-    return;
-  }
-
-  const correctIndex = parseInt(
-    document.querySelector('input[name="correct"]:checked').value
+// Try to get user's location
+if (navigator.geolocation) {
+  navigator.geolocation.getCurrentPosition(
+    function (pos) {
+      map.setView([pos.coords.latitude, pos.coords.longitude], 13);
+    },
+    function () {
+      // Default view if denied
+    }
   );
-
-  questions.push({
-    question: questionText,
-    options: options,
-    correctIndex: correctIndex,
-  });
-
-  renderQuestionsList();
-  clearForm();
-  questionInput.focus();
 }
 
-function removeQuestion(index) {
-  questions.splice(index, 1);
-  renderQuestionsList();
-}
-
-function renderQuestionsList() {
-  if (questions.length === 0) {
-    questionsList.classList.add('hidden');
-    return;
-  }
-
-  questionsList.classList.remove('hidden');
-  questionsUl.innerHTML = '';
-
-  questions.forEach((q, i) => {
-    const li = document.createElement('li');
-    const span = document.createElement('span');
-    span.textContent = `${i + 1}. ${q.question}`;
-
-    const removeBtn = document.createElement('button');
-    removeBtn.textContent = 'Remove';
-    removeBtn.className = 'remove-btn';
-    removeBtn.onclick = () => removeQuestion(i);
-
-    li.appendChild(span);
-    li.appendChild(removeBtn);
-    questionsUl.appendChild(li);
+// --- Marker helpers ---
+function createIcon(color) {
+  return L.divIcon({
+    className: 'custom-marker',
+    html: '<svg width="28" height="40" viewBox="0 0 28 40" xmlns="http://www.w3.org/2000/svg">'
+      + '<path d="M14 0C6.27 0 0 6.27 0 14c0 10.5 14 26 14 26s14-15.5 14-26C28 6.27 21.73 0 14 0z" fill="' + color + '"/>'
+      + '<circle cx="14" cy="14" r="6" fill="#fff"/>'
+      + '</svg>',
+    iconSize: [28, 40],
+    iconAnchor: [14, 40],
+    popupAnchor: [0, -36],
   });
 }
 
-function clearForm() {
-  questionInput.value = '';
-  optionInputs.forEach((input) => (input.value = ''));
-  document.querySelector('input[name="correct"][value="0"]').checked = true;
+function buildPopupHTML(place) {
+  var cat = categories[place.category] || categories.default;
+  var desc = place.description
+    ? '<p>' + escapeHTML(place.description) + '</p>'
+    : '';
+  return '<div class="popup-content">'
+    + '<span class="popup-category" style="background:' + cat.color + '">' + cat.label + '</span>'
+    + '<h4>' + escapeHTML(place.name) + '</h4>'
+    + desc
+    + '<div class="popup-actions">'
+    + '<button class="secondary" onclick="deletePlace(\'' + place.id + '\')">Delete</button>'
+    + '</div>'
+    + '</div>';
 }
 
-function shakeElement(el) {
-  el.style.borderColor = '#f44336';
-  el.style.animation = 'none';
-  el.offsetHeight; // trigger reflow
-  el.style.animation = 'shake 0.4s ease';
-  setTimeout(() => {
-    el.style.borderColor = '';
-    el.style.animation = '';
-  }, 600);
+function addMarkerToMap(place) {
+  var cat = categories[place.category] || categories.default;
+  var marker = L.marker([place.lat, place.lng], {
+    icon: createIcon(cat.color),
+  }).addTo(map);
+
+  marker.bindPopup(buildPopupHTML(place));
+  markers[place.id] = marker;
 }
 
-// --- Quiz Taking ---
+// --- Map click handler ---
+map.on('click', function (e) {
+  pendingLatLng = e.latlng;
 
-function startQuiz() {
-  currentQuestionIndex = 0;
-  score = 0;
-  userAnswers = [];
-
-  document.getElementById('quiz-area').classList.remove('hidden');
-  document.getElementById('results-area').classList.add('hidden');
-
-  showQuestion();
-}
-
-function showQuestion() {
-  const q = questions[currentQuestionIndex];
-  const total = questions.length;
-
-  // Update progress
-  const progress = ((currentQuestionIndex) / total) * 100;
-  document.getElementById('progress-fill').style.width = progress + '%';
-  document.getElementById('question-counter').textContent =
-    `Question ${currentQuestionIndex + 1} of ${total}`;
-  document.getElementById('quiz-question').textContent = q.question;
-
-  // Render options
-  const optionsDiv = document.getElementById('quiz-options');
-  optionsDiv.innerHTML = '';
-
-  q.options.forEach((option, i) => {
-    const btn = document.createElement('button');
-    btn.className = 'quiz-option';
-    btn.textContent = option;
-    btn.onclick = () => selectAnswer(i);
-    optionsDiv.appendChild(btn);
-  });
-
-  // Hide feedback and next button
-  const feedback = document.getElementById('feedback');
-  feedback.classList.add('hidden');
-  feedback.className = 'hidden';
-  document.getElementById('next-btn').classList.add('hidden');
-}
-
-function selectAnswer(selectedIndex) {
-  const q = questions[currentQuestionIndex];
-  const isCorrect = selectedIndex === q.correctIndex;
-  const optionButtons = document.querySelectorAll('.quiz-option');
-
-  // Disable all buttons
-  optionButtons.forEach((btn) => (btn.disabled = true));
-
-  // Highlight correct and wrong
-  optionButtons[q.correctIndex].classList.add('correct');
-  if (!isCorrect) {
-    optionButtons[selectedIndex].classList.add('wrong');
+  // Remove previous temp marker
+  if (tempMarker) {
+    map.removeLayer(tempMarker);
   }
 
-  // Show feedback
-  const feedback = document.getElementById('feedback');
-  feedback.classList.remove('hidden');
-  if (isCorrect) {
-    feedback.className = 'correct';
-    feedback.textContent = 'Correct!';
-    score++;
-  } else {
-    feedback.className = 'wrong';
-    feedback.textContent = `Wrong! The correct answer was: ${q.options[q.correctIndex]}`;
-  }
+  // Place a temporary marker
+  tempMarker = L.marker(e.latlng, {
+    icon: createIcon('#999'),
+    opacity: 0.7,
+  }).addTo(map);
 
-  userAnswers.push({
-    question: q.question,
-    selected: q.options[selectedIndex],
-    correct: q.options[q.correctIndex],
-    isCorrect: isCorrect,
-  });
-
-  // Show next button
-  document.getElementById('next-btn').classList.remove('hidden');
-  document.getElementById('next-btn').textContent =
-    currentQuestionIndex < questions.length - 1 ? 'Next Question' : 'See Results';
-}
-
-function nextQuestion() {
-  currentQuestionIndex++;
-  if (currentQuestionIndex < questions.length) {
-    showQuestion();
-  } else {
-    showResults();
-  }
-}
-
-function showResults() {
-  document.getElementById('quiz-area').classList.add('hidden');
-  document.getElementById('results-area').classList.remove('hidden');
-
-  const percentage = Math.round((score / questions.length) * 100);
-
-  document.getElementById('score-display').innerHTML = `
-    <div class="score-number">${percentage}%</div>
-    <div class="score-label">${score} out of ${questions.length} correct</div>
-  `;
-
-  const detailsEl = document.getElementById('results-details');
-  detailsEl.innerHTML = '';
-
-  userAnswers.forEach((a, i) => {
-    const div = document.createElement('div');
-    div.className = `result-item ${a.isCorrect ? 'correct' : 'wrong'}`;
-    div.innerHTML = `
-      <div class="result-question">${i + 1}. ${a.question}</div>
-      <div class="result-answer">
-        Your answer: ${a.selected}
-        ${!a.isCorrect ? `<br>Correct answer: ${a.correct}` : ''}
-      </div>
-    `;
-    detailsEl.appendChild(div);
-  });
-}
-
-function retakeQuiz() {
-  startQuiz();
-}
-
-// --- Allow Enter key to add questions ---
-document.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter' && !createModeEl.classList.contains('hidden')) {
-    e.preventDefault();
-    addQuestion();
-  }
+  // Show the form
+  showForm();
 });
 
-// --- Add shake animation ---
-const style = document.createElement('style');
-style.textContent = `
-  @keyframes shake {
-    0%, 100% { transform: translateX(0); }
-    25% { transform: translateX(-6px); }
-    75% { transform: translateX(6px); }
-  }
-`;
-document.head.appendChild(style);
+// --- Form ---
+function showForm() {
+  document.getElementById('place-form').classList.remove('hidden');
+  document.getElementById('place-name').value = '';
+  document.getElementById('place-desc').value = '';
+  document.getElementById('place-category').value = 'default';
+  document.getElementById('place-name').focus();
+}
 
-// Initialize
-updateMenuStatus();
+function cancelForm() {
+  document.getElementById('place-form').classList.add('hidden');
+  if (tempMarker) {
+    map.removeLayer(tempMarker);
+    tempMarker = null;
+  }
+  pendingLatLng = null;
+}
+
+function savePlace() {
+  var name = document.getElementById('place-name').value.trim();
+  if (!name) {
+    document.getElementById('place-name').style.borderColor = '#ea4335';
+    document.getElementById('place-name').focus();
+    return;
+  }
+  document.getElementById('place-name').style.borderColor = '';
+
+  var place = {
+    id: Date.now().toString(36) + Math.random().toString(36).slice(2, 7),
+    name: name,
+    description: document.getElementById('place-desc').value.trim(),
+    category: document.getElementById('place-category').value,
+    lat: pendingLatLng.lat,
+    lng: pendingLatLng.lng,
+    createdAt: new Date().toISOString(),
+  };
+
+  places.push(place);
+  persistPlaces();
+
+  // Replace temp marker with real one
+  if (tempMarker) {
+    map.removeLayer(tempMarker);
+    tempMarker = null;
+  }
+  addMarkerToMap(place);
+
+  // Hide form and refresh list
+  document.getElementById('place-form').classList.add('hidden');
+  pendingLatLng = null;
+  renderPlacesList();
+}
+
+// --- CRUD ---
+function deletePlace(id) {
+  places = places.filter(function (p) { return p.id !== id; });
+  persistPlaces();
+
+  // Remove marker
+  if (markers[id]) {
+    map.removeLayer(markers[id]);
+    delete markers[id];
+  }
+
+  map.closePopup();
+  renderPlacesList();
+}
+
+function clearAllPlaces() {
+  if (!confirm('Remove all saved places?')) return;
+  places = [];
+  persistPlaces();
+
+  // Remove all markers
+  Object.keys(markers).forEach(function (id) {
+    map.removeLayer(markers[id]);
+  });
+  markers = {};
+
+  map.closePopup();
+  renderPlacesList();
+}
+
+function goToPlace(id) {
+  var place = places.find(function (p) { return p.id === id; });
+  if (!place) return;
+  map.setView([place.lat, place.lng], 16);
+  if (markers[id]) {
+    markers[id].openPopup();
+  }
+  // Close sidebar on mobile
+  if (window.innerWidth <= 768) {
+    document.getElementById('sidebar').classList.remove('open');
+  }
+}
+
+// --- Persistence ---
+function persistPlaces() {
+  localStorage.setItem('myPlaces', JSON.stringify(places));
+}
+
+// --- Render list ---
+function renderPlacesList(filter) {
+  var list = document.getElementById('places-list');
+  var emptyMsg = document.getElementById('empty-message');
+  list.innerHTML = '';
+
+  var filtered = places;
+  if (filter) {
+    var q = filter.toLowerCase();
+    filtered = places.filter(function (p) {
+      return p.name.toLowerCase().includes(q) || p.description.toLowerCase().includes(q);
+    });
+  }
+
+  if (places.length === 0) {
+    list.appendChild(emptyMsg);
+    emptyMsg.style.display = '';
+    return;
+  }
+
+  if (filtered.length === 0) {
+    var noResults = document.createElement('p');
+    noResults.className = 'empty-msg';
+    noResults.textContent = 'No places match your search.';
+    list.appendChild(noResults);
+    return;
+  }
+
+  filtered.forEach(function (place) {
+    var item = document.createElement('div');
+    item.className = 'place-item';
+    item.onclick = function () { goToPlace(place.id); };
+
+    var dot = document.createElement('div');
+    dot.className = 'category-dot cat-' + place.category;
+
+    var info = document.createElement('div');
+    info.className = 'place-info';
+
+    var nameEl = document.createElement('div');
+    nameEl.className = 'place-name';
+    nameEl.textContent = place.name;
+
+    var descEl = document.createElement('div');
+    descEl.className = 'place-desc';
+    descEl.textContent = place.description || categories[place.category].label;
+
+    var coordsEl = document.createElement('div');
+    coordsEl.className = 'place-coords';
+    coordsEl.textContent = place.lat.toFixed(5) + ', ' + place.lng.toFixed(5);
+
+    info.appendChild(nameEl);
+    info.appendChild(descEl);
+    info.appendChild(coordsEl);
+
+    var delBtn = document.createElement('button');
+    delBtn.className = 'delete-btn';
+    delBtn.innerHTML = '&times;';
+    delBtn.title = 'Delete place';
+    delBtn.onclick = function (e) {
+      e.stopPropagation();
+      deletePlace(place.id);
+    };
+
+    item.appendChild(dot);
+    item.appendChild(info);
+    item.appendChild(delBtn);
+    list.appendChild(item);
+  });
+}
+
+// --- Search ---
+document.getElementById('search-input').addEventListener('input', function (e) {
+  renderPlacesList(e.target.value);
+});
+
+// --- Export ---
+function exportPlaces() {
+  if (places.length === 0) {
+    alert('No places to export.');
+    return;
+  }
+  var data = JSON.stringify(places, null, 2);
+  var blob = new Blob([data], { type: 'application/json' });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = 'my-places.json';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+// --- Mobile sidebar toggle ---
+function toggleSidebar() {
+  document.getElementById('sidebar').classList.toggle('open');
+}
+
+// --- Utility ---
+function escapeHTML(str) {
+  var div = document.createElement('div');
+  div.appendChild(document.createTextNode(str));
+  return div.innerHTML;
+}
+
+// --- Initialize ---
+// Load saved markers
+places.forEach(function (place) {
+  addMarkerToMap(place);
+});
+renderPlacesList();
