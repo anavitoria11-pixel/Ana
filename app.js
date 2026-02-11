@@ -232,6 +232,7 @@ function detectLocationContext(text) {
   }
 
   // Pattern: Look for well-known city/country names anywhere in the text
+  // Using word-boundary matching to avoid "Thai food" matching "Thailand"
   var knownLocations = [
     'New York', 'Los Angeles', 'Chicago', 'San Francisco', 'Miami', 'Seattle', 'Boston',
     'Austin', 'Nashville', 'Portland', 'Denver', 'Atlanta', 'Houston', 'Dallas', 'Phoenix',
@@ -243,7 +244,7 @@ function detectLocationContext(text) {
     'Sydney', 'Melbourne', 'Auckland', 'Toronto', 'Vancouver', 'Montreal',
     'Mexico City', 'Buenos Aires', 'São Paulo', 'Rio de Janeiro', 'Lima', 'Bogota',
     'Cape Town', 'Marrakech', 'Cairo', 'Nairobi',
-    'Brooklyn', 'Manhattan', 'Queens', 'Soho', 'Williamsburg', 'Shoreditch', 'Montmartre',
+    'Brooklyn', 'Manhattan', 'Queens', 'Williamsburg', 'Shoreditch', 'Montmartre',
     'Trastevere', 'Shibuya', 'Shinjuku', 'Gangnam',
     'Italy', 'France', 'Spain', 'Germany', 'Japan', 'Thailand', 'Portugal', 'Greece',
     'Mexico', 'Brazil', 'Australia', 'Canada', 'England', 'Scotland', 'Ireland',
@@ -251,16 +252,24 @@ function detectLocationContext(text) {
   ];
 
   knownLocations.forEach(function (loc) {
-    if (fullText.indexOf(loc.toLowerCase()) !== -1) {
+    // Use word boundary regex to avoid partial matches like "Thai" in "Thailand"
+    var pattern = new RegExp('\\b' + loc.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'i');
+    if (pattern.test(text)) {
       contexts.push(loc);
     }
   });
 
-  // Deduplicate and pick the best context
+  // Deduplicate - pattern-extracted contexts come first (they're more reliable),
+  // known-location keyword matches come after
   var unique = [];
   var seenLower = {};
   contexts.forEach(function (c) {
     var key = c.toLowerCase().trim();
+    // Skip context if it's a cuisine/food word, not an actual location reference
+    // e.g. "Thai" in "Thai restaurant", "Indian" in "Indian food", "Italian" in "Italian cuisine"
+    var cuisineWords = /^(thai|indian|chinese|japanese|korean|italian|french|mexican|spanish|greek|turkish|vietnamese|ethiopian|moroccan|lebanese|persian|american|british|german|brazilian|peruvian|cuban|african|asian|european|mediterranean|middle eastern|latin)$/i;
+    if (cuisineWords.test(key)) return;
+
     if (!seenLower[key]) {
       seenLower[key] = true;
       unique.push(c);
