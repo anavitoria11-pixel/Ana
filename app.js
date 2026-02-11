@@ -194,134 +194,298 @@ function triggerPhotoUpload() {
   document.getElementById('photo-input').click();
 }
 
-// AI Text Interpreter - extracts place names from raw OCR text
-function extractPlaceCandidates(text) {
-  var lines = text.split('\n')
-    .map(function (l) { return l.trim(); })
-    .filter(function (l) { return l.length > 2; });
+// ---- AI Text Interpreter ----
+// Step 1: Detect location context (city, country, region, neighborhood)
+// Step 2: Extract individual place names from the list
+// Step 3: Combine each name + context for accurate geocoding
 
-  // Noise words that are unlikely to be place names
+function detectLocationContext(text) {
+  var fullText = text.toLowerCase();
+  var contexts = [];
+
+  // Pattern: "in <Location>" or "of <Location>" or "near <Location>"
+  var inPatterns = /(?:^|\b)(?:in|of|near|around|across|throughout|visiting|explore|exploring)\s+([A-Z][A-Za-zÀ-ÿ\s\-\.]+)/gim;
+  var m;
+  while ((m = inPatterns.exec(text)) !== null) {
+    var loc = m[1].trim().replace(/[.!?,;:]+$/, '').trim();
+    if (loc.length >= 3 && loc.length <= 50 && !isNoiseLine(loc)) {
+      contexts.push(loc);
+    }
+  }
+
+  // Pattern: "<Location>'s best / top / favorite"
+  var possessivePattern = /([A-Z][A-Za-zÀ-ÿ\s\-\.]+?)(?:'s|'s)\s+(?:best|top|favorite|favourite|greatest|finest|popular|famous|hidden|must|essential)/gi;
+  while ((m = possessivePattern.exec(text)) !== null) {
+    var loc2 = m[1].trim();
+    if (loc2.length >= 3 && loc2.length <= 50 && !isNoiseLine(loc2)) {
+      contexts.push(loc2);
+    }
+  }
+
+  // Pattern: "Best <thing> in <Location>" header style
+  var headerPattern = /(?:best|top|must|favorite|favourite|popular|famous|hidden|essential|amazing|incredible|great)\s+(?:[\w\s]+?)\s+(?:in|of|near|around)\s+([A-Z][A-Za-zÀ-ÿ\s\-\.]+)/gi;
+  while ((m = headerPattern.exec(text)) !== null) {
+    var loc3 = m[1].trim().replace(/[.!?,;:]+$/, '').trim();
+    if (loc3.length >= 3 && loc3.length <= 50 && !isNoiseLine(loc3)) {
+      contexts.push(loc3);
+    }
+  }
+
+  // Pattern: Look for well-known city/country names anywhere in the text
+  var knownLocations = [
+    'New York', 'Los Angeles', 'Chicago', 'San Francisco', 'Miami', 'Seattle', 'Boston',
+    'Austin', 'Nashville', 'Portland', 'Denver', 'Atlanta', 'Houston', 'Dallas', 'Phoenix',
+    'London', 'Paris', 'Rome', 'Barcelona', 'Madrid', 'Berlin', 'Amsterdam', 'Prague',
+    'Vienna', 'Lisbon', 'Athens', 'Istanbul', 'Dublin', 'Edinburgh', 'Copenhagen',
+    'Stockholm', 'Oslo', 'Helsinki', 'Brussels', 'Munich', 'Milan', 'Florence', 'Venice',
+    'Tokyo', 'Kyoto', 'Osaka', 'Seoul', 'Bangkok', 'Singapore', 'Hong Kong', 'Taipei',
+    'Shanghai', 'Beijing', 'Dubai', 'Mumbai', 'Delhi', 'Bali', 'Hanoi', 'Saigon',
+    'Sydney', 'Melbourne', 'Auckland', 'Toronto', 'Vancouver', 'Montreal',
+    'Mexico City', 'Buenos Aires', 'São Paulo', 'Rio de Janeiro', 'Lima', 'Bogota',
+    'Cape Town', 'Marrakech', 'Cairo', 'Nairobi',
+    'Brooklyn', 'Manhattan', 'Queens', 'Soho', 'Williamsburg', 'Shoreditch', 'Montmartre',
+    'Trastevere', 'Shibuya', 'Shinjuku', 'Gangnam',
+    'Italy', 'France', 'Spain', 'Germany', 'Japan', 'Thailand', 'Portugal', 'Greece',
+    'Mexico', 'Brazil', 'Australia', 'Canada', 'England', 'Scotland', 'Ireland',
+    'California', 'Texas', 'Florida', 'Hawaii', 'Colorado', 'Oregon', 'Washington',
+  ];
+
+  knownLocations.forEach(function (loc) {
+    if (fullText.indexOf(loc.toLowerCase()) !== -1) {
+      contexts.push(loc);
+    }
+  });
+
+  // Deduplicate and pick the best context
+  var unique = [];
+  var seenLower = {};
+  contexts.forEach(function (c) {
+    var key = c.toLowerCase().trim();
+    if (!seenLower[key]) {
+      seenLower[key] = true;
+      unique.push(c);
+    }
+  });
+
+  return unique;
+}
+
+// Check if a line is noise (not a place name)
+function isNoiseLine(text) {
   var noisePatterns = [
-    /^(menu|price|total|subtotal|tax|tip|receipt|order|qty|item|date|time|thank|welcome|enjoy|please|www\.|http|@|#\d)$/i,
-    /^\d+[\.\,]\d{2}$/, // prices like 12.99
+    /^(menu|price|total|subtotal|tax|tip|receipt|order|qty|item|date|time|thank|welcome|enjoy|please|www\.|http|@|#\d)/i,
+    /^\d+[\.\,]\d{2}$/, // prices
     /^\$[\d\.\,]+$/, // dollar amounts
     /^\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}$/, // dates
     /^\d{1,2}:\d{2}/, // times
     /^tel|^phone|^fax|^email/i,
     /^\d+$/, // just numbers
-    /^[^a-zA-Z]*$/, // no letters at all
+    /^[^a-zA-ZÀ-ÿ]*$/, // no letters at all
+    /\b(click|tap|swipe|login|sign in|password|subscribe|follow us|share|download|upload|settings|profile|account|cancel|confirm)\b/i,
   ];
+
+  for (var i = 0; i < noisePatterns.length; i++) {
+    if (noisePatterns[i].test(text)) return true;
+  }
+  return false;
+}
+
+function extractPlaceCandidates(text) {
+  var lines = text.split('\n')
+    .map(function (l) { return l.trim(); })
+    .filter(function (l) { return l.length > 2; });
+
+  // Detect location context from the full text
+  var locationContexts = detectLocationContext(text);
+  var bestContext = locationContexts.length > 0 ? locationContexts[0] : '';
 
   var candidates = [];
   var seen = {};
 
+  // Clean and score each line
   lines.forEach(function (line) {
-    // Skip noise
-    for (var i = 0; i < noisePatterns.length; i++) {
-      if (noisePatterns[i].test(line)) return;
-    }
-
-    // Clean up OCR artifacts
+    // Clean OCR artifacts
     var cleaned = line
-      .replace(/[|}{[\]\\]/g, '') // remove OCR artifacts
-      .replace(/\s{2,}/g, ' ')    // collapse spaces
+      .replace(/[|}{[\]\\]/g, '')
+      .replace(/\s{2,}/g, ' ')
       .trim();
 
     if (cleaned.length < 3 || cleaned.length > 120) return;
+    if (isNoiseLine(cleaned)) return;
 
-    // Score this line as a potential place name
-    var score = scorePlaceCandidate(cleaned);
-    if (score > 0) {
-      var key = cleaned.toLowerCase();
+    // Strip common list prefixes: "1.", "1)", "•", "-", "*", "#1", etc.
+    var stripped = cleaned
+      .replace(/^[\d]+[\.\)]\s*/, '')
+      .replace(/^[•\-\*\#\>\→\►]+\s*/, '')
+      .replace(/^#\d+\s*[\.\:\-]?\s*/, '')
+      .trim();
+
+    if (stripped.length < 3) return;
+
+    // Remove trailing descriptions after " - " or " | " or " — "
+    // e.g. "Le Comptoir - French bistro" → "Le Comptoir"
+    var placeName = stripped.split(/\s[\-\|—–]\s/)[0].trim();
+
+    // Also handle "PlaceName: description" pattern
+    if (/^[A-ZÀ-ÿ]/.test(placeName) && placeName.indexOf(':') > 3) {
+      var beforeColon = placeName.split(':')[0].trim();
+      if (beforeColon.length >= 3 && beforeColon.length <= 60) {
+        placeName = beforeColon;
+      }
+    }
+
+    // Remove trailing ratings/stars like "(4.5)" or "★★★★"
+    placeName = placeName
+      .replace(/\s*[\(（][\d\.]+[\)）]\s*$/, '')
+      .replace(/\s*[★☆✩✭⭐]+\s*$/, '')
+      .replace(/\s*\d+(\.\d+)?\s*stars?\s*$/i, '')
+      .trim();
+
+    if (placeName.length < 3 || placeName.length > 80) return;
+
+    var score = scorePlaceCandidate(placeName, cleaned);
+    if (score >= 0) {
+      var key = placeName.toLowerCase();
       if (!seen[key]) {
         seen[key] = true;
-        candidates.push({ text: cleaned, score: score });
+        candidates.push({ text: placeName, score: score, originalLine: cleaned });
       }
     }
   });
 
-  // Also try to extract multi-word proper nouns and addresses from longer text blocks
-  var fullText = lines.join(' ');
-  var addressPattern = /\d{1,5}\s+[A-Z][a-zA-Z\s]+(?:St|Street|Ave|Avenue|Blvd|Boulevard|Rd|Road|Dr|Drive|Ln|Lane|Way|Pl|Place|Ct|Court)\.?(?:\s*,?\s*[A-Z][a-zA-Z\s]+)?/g;
-  var match;
-  while ((match = addressPattern.exec(fullText)) !== null) {
-    var addr = match[0].trim();
-    var addrKey = addr.toLowerCase();
-    if (!seen[addrKey]) {
-      seen[addrKey] = true;
-      candidates.push({ text: addr, score: 8 });
-    }
-  }
-
-  // Sort by score (highest first)
+  // Sort by score
   candidates.sort(function (a, b) { return b.score - a.score; });
 
-  // Return top candidates (limit to prevent too many API calls)
-  return candidates.slice(0, 10);
+  // Limit candidates
+  candidates = candidates.slice(0, 12);
+
+  // Attach the location context for geocoding
+  candidates.forEach(function (c) {
+    c.locationContext = bestContext;
+    c.allContexts = locationContexts;
+  });
+
+  return candidates;
 }
 
-function scorePlaceCandidate(text) {
-  var score = 0;
+function scorePlaceCandidate(text, fullLine) {
+  var score = 1; // Start at 1 so most proper nouns get through
 
-  // Starts with capital letter (proper noun)
-  if (/^[A-Z]/.test(text)) score += 2;
+  // Starts with capital letter or accented capital (proper noun)
+  if (/^[A-ZÀ-ÿ]/.test(text)) score += 2;
 
-  // Contains multiple capitalized words (likely a place name)
-  var capsWords = text.match(/[A-Z][a-zA-Z]+/g);
+  // Multiple capitalized words (very likely a place name)
+  var capsWords = text.match(/[A-ZÀ-ÿ][a-zA-ZÀ-ÿ]+/g);
   if (capsWords && capsWords.length >= 2) score += 2;
+
+  // Contains location venue keywords
+  if (/\b(restaurant|cafe|café|bar|pub|bistro|trattoria|osteria|brasserie|pizzeria|bakery|diner|grill|steakhouse|sushi|ramen|taqueria|cantina|bodega|gelateria|patisserie|boulangerie|cerveceria|tapas)\b/i.test(fullLine || text)) score += 3;
+
+  if (/\b(hotel|hostel|inn|resort|lodge|motel|airbnb|bnb|guesthouse)\b/i.test(fullLine || text)) score += 3;
+
+  if (/\b(park|museum|gallery|church|cathedral|temple|mosque|synagogue|theater|theatre|cinema|stadium|arena|zoo|aquarium|garden|botanical|monument|memorial|landmark|ruins|castle|palace|fortress|tower|lighthouse|bridge)\b/i.test(fullLine || text)) score += 3;
+
+  if (/\b(market|bazaar|mall|shop|store|boutique|bookstore|bookshop|flea market|night market)\b/i.test(fullLine || text)) score += 3;
+
+  if (/\b(beach|lake|mountain|trail|hiking|waterfall|canyon|valley|island|bay|harbor|harbour|pier|boardwalk|promenade|viewpoint|lookout|overlook)\b/i.test(fullLine || text)) score += 3;
 
   // Contains address-like patterns
   if (/\d{1,5}\s+[A-Z]/.test(text)) score += 3;
 
-  // Contains location keywords
-  if (/\b(restaurant|cafe|bar|hotel|park|museum|church|theater|theatre|market|plaza|square|beach|lake|mountain|bridge|station|airport|hospital|university|school|library|store|shop|mall|garden|temple|palace|castle|tower|port|harbor|harbour)\b/i.test(text)) score += 4;
-
   // Contains street/address suffixes
-  if (/\b(st|street|ave|avenue|blvd|boulevard|rd|road|dr|drive|ln|lane|way|pl|place|ct|court|hwy|highway)\b\.?\s/i.test(text)) score += 3;
+  if (/\b(st|street|ave|avenue|blvd|boulevard|rd|road|dr|drive|ln|lane|way|place|ct|court)\b\.?/i.test(text)) score += 3;
 
-  // Contains city/country indicators
-  if (/\b(city|town|village|district|borough|county|state|province)\b/i.test(text)) score += 2;
+  // Short, clean proper noun (2-5 words, capitalized) - typical place name from a list
+  var wordCount = text.split(/\s+/).length;
+  if (wordCount >= 1 && wordCount <= 5 && /^[A-ZÀ-ÿ]/.test(text)) score += 2;
 
-  // Has a reasonable length for a place name (3-60 chars)
-  if (text.length >= 5 && text.length <= 60) score += 1;
+  // Looks like a list item (was prefixed with number or bullet)
+  if (/^[A-ZÀ-ÿ]/.test(text) && wordCount <= 6) score += 1;
 
-  // Penalize things that look like UI elements or generic text
-  if (/\b(click|tap|swipe|login|sign|password|email|subscribe|follow|share|like|comment|download|upload|settings|profile|account|cancel|confirm|ok|yes|no)\b/i.test(text)) score -= 5;
+  // Has non-English characters (accented names often = authentic place names)
+  if (/[À-ÿ]/.test(text)) score += 1;
 
-  // Penalize very long strings (probably paragraphs, not place names)
-  if (text.length > 80) score -= 3;
+  // Penalize generic/UI text
+  if (/\b(click|tap|swipe|login|sign|password|email|subscribe|follow|share|like|comment|download|upload|settings|profile|account|cancel|confirm|ok|yes|no|read more|see more|view|load|save|edit|delete|back|next|previous|home|about|contact)\b/i.test(text)) score -= 8;
 
-  // Penalize all-caps (usually headers/labels, not place names)
-  if (text === text.toUpperCase() && text.length > 10) score -= 1;
+  // Penalize full sentences (place names are short)
+  if (wordCount > 8) score -= 3;
+
+  // Penalize very long strings
+  if (text.length > 60) score -= 2;
 
   return score;
 }
 
-// Geocode a single candidate, returns a promise
+// Geocode a candidate, using location context to improve results
 function geocodeCandidate(candidate) {
-  return fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&q=' + encodeURIComponent(candidate.text))
+  // Build search query: "place name, context location"
+  var query = candidate.text;
+  if (candidate.locationContext) {
+    query = candidate.text + ', ' + candidate.locationContext;
+  }
+
+  return fetch('https://nominatim.openstreetmap.org/search?format=json&limit=3&q=' + encodeURIComponent(query))
     .then(function (res) { return res.json(); })
     .then(function (data) {
       if (data && data.length > 0) {
+        // Pick the best result - prefer ones that are actual places (not regions)
+        var best = data[0];
+        for (var i = 0; i < data.length; i++) {
+          var type = (data[i].type || '').toLowerCase();
+          var cls = (data[i].class || '').toLowerCase();
+          // Prefer amenities, tourism, shops, leisure over administrative boundaries
+          if (cls === 'amenity' || cls === 'tourism' || cls === 'shop' || cls === 'leisure') {
+            best = data[i];
+            break;
+          }
+        }
+
         return {
           query: candidate.text,
+          searchQuery: query,
           score: candidate.score,
-          lat: parseFloat(data[0].lat),
-          lng: parseFloat(data[0].lon),
-          displayName: data[0].display_name,
-          name: data[0].display_name.split(',')[0],
-          address: data[0].display_name.split(',').slice(1, 4).join(',').trim()
+          lat: parseFloat(best.lat),
+          lng: parseFloat(best.lon),
+          displayName: best.display_name,
+          name: best.display_name.split(',')[0],
+          address: best.display_name.split(',').slice(1, 4).join(',').trim(),
+          context: candidate.locationContext || ''
         };
       }
+
+      // If search with context failed, try without context as fallback
+      if (candidate.locationContext) {
+        return fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&q=' + encodeURIComponent(candidate.text))
+          .then(function (res) { return res.json(); })
+          .then(function (data2) {
+            if (data2 && data2.length > 0) {
+              return {
+                query: candidate.text,
+                searchQuery: candidate.text,
+                score: candidate.score,
+                lat: parseFloat(data2[0].lat),
+                lng: parseFloat(data2[0].lon),
+                displayName: data2[0].display_name,
+                name: data2[0].display_name.split(',')[0],
+                address: data2[0].display_name.split(',').slice(1, 4).join(',').trim(),
+                context: ''
+              };
+            }
+            return null;
+          });
+      }
+
       return null;
     })
     .catch(function () { return null; });
 }
 
 // Stagger requests to respect Nominatim rate limits (1 req/sec)
-function geocodeCandidatesSequentially(candidates) {
+function geocodeCandidatesSequentially(candidates, onProgress) {
   var results = [];
   var index = 0;
+  var total = candidates.length;
 
   return new Promise(function (resolve) {
     function next() {
@@ -332,11 +496,18 @@ function geocodeCandidatesSequentially(candidates) {
       var candidate = candidates[index];
       index++;
 
+      if (onProgress) onProgress(index, total);
+
       geocodeCandidate(candidate).then(function (result) {
         if (result) {
-          results.push(result);
-          // Update UI as results come in
-          renderScanFoundPlaces(results);
+          // Deduplicate by lat/lng (avoid same place matched multiple ways)
+          var isDupe = results.some(function (r) {
+            return Math.abs(r.lat - result.lat) < 0.0005 && Math.abs(r.lng - result.lng) < 0.0005;
+          });
+          if (!isDupe) {
+            results.push(result);
+            renderScanFoundPlaces(results);
+          }
         }
         // 1.1 second delay for Nominatim rate limit
         setTimeout(next, 1100);
@@ -389,6 +560,12 @@ document.getElementById('photo-input').addEventListener('change', function (e) {
     // AI interpretation step: extract place candidates
     var candidates = extractPlaceCandidates(text);
 
+    // Show detected context
+    var contextInfo = '';
+    if (candidates.length > 0 && candidates[0].locationContext) {
+      contextInfo = ' (near ' + candidates[0].locationContext + ')';
+    }
+
     if (candidates.length === 0) {
       title.textContent = 'No place names detected. Try manual search below.';
       progressFill.style.width = '100%';
@@ -399,13 +576,17 @@ document.getElementById('photo-input').addEventListener('change', function (e) {
       return;
     }
 
-    title.textContent = 'Found ' + candidates.length + ' potential places. Looking them up...';
+    title.textContent = 'Found ' + candidates.length + ' potential places' + contextInfo + '. Looking them up...';
     resultsDiv.classList.remove('hidden');
     document.getElementById('scan-found-places').innerHTML = '<div class="loading">Searching for locations...</div>';
     document.getElementById('scan-raw-text').textContent = text;
 
-    // Geocode all candidates
-    geocodeCandidatesSequentially(candidates).then(function (foundPlaces) {
+    // Geocode all candidates with progress updates
+    geocodeCandidatesSequentially(candidates, function (current, total) {
+      var pct = 75 + Math.round((current / total) * 25);
+      progressFill.style.width = pct + '%';
+      title.textContent = 'Looking up ' + current + '/' + total + contextInfo + '...';
+    }).then(function (foundPlaces) {
       progressFill.style.width = '100%';
       document.getElementById('scan-progress').classList.add('hidden');
       scanFoundPlaces = foundPlaces;
@@ -414,7 +595,7 @@ document.getElementById('photo-input').addEventListener('change', function (e) {
         title.textContent = 'No locations found. Try manual search below.';
         document.getElementById('scan-found-places').innerHTML = '<div class="loading">No matching locations. Try editing text and searching manually.</div>';
       } else {
-        title.textContent = foundPlaces.length + ' place' + (foundPlaces.length > 1 ? 's' : '') + ' found!';
+        title.textContent = foundPlaces.length + ' place' + (foundPlaces.length > 1 ? 's' : '') + ' found' + contextInfo + '!';
         renderScanFoundPlaces(foundPlaces);
       }
     });
