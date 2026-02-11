@@ -211,6 +211,115 @@ body {
   overflow-y: auto;
 }
 
+/* Scan found places */
+#scan-found-places {
+  max-height: 280px;
+  overflow-y: auto;
+  margin-bottom: 0.5rem;
+}
+
+.scan-add-all-btn {
+  width: 100%;
+  padding: 0.6rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+  border-radius: 8px;
+}
+
+.scan-place-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.5rem 0.6rem;
+  border-bottom: 1px solid #e8e8e8;
+  cursor: pointer;
+  border-radius: 6px;
+  transition: background 0.15s;
+  gap: 0.5rem;
+}
+
+.scan-place-item:last-child {
+  border-bottom: none;
+}
+
+.scan-place-item:hover {
+  background: #e3ecff;
+}
+
+.scan-place-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.scan-place-name {
+  font-weight: 600;
+  font-size: 0.85rem;
+  color: #333;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.scan-place-address {
+  font-size: 0.73rem;
+  color: #888;
+  margin-top: 0.1rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.scan-place-query {
+  font-size: 0.68rem;
+  color: #aaa;
+  font-style: italic;
+  margin-top: 0.1rem;
+}
+
+.scan-add-btn {
+  flex-shrink: 0;
+  padding: 0.35rem 0.75rem;
+  font-size: 0.78rem;
+  border-radius: 6px;
+  white-space: nowrap;
+}
+
+.scan-btn-added {
+  background: #e8e8e8 !important;
+  color: #999 !important;
+  cursor: default;
+}
+
+.scan-btn-added:hover {
+  transform: none;
+  opacity: 1;
+}
+
+/* Raw text */
+#scan-raw-container {
+  margin: 0.4rem 0;
+}
+
+#scan-raw-text {
+  background: #f4f6f8;
+  padding: 0.5rem;
+  border-radius: 6px;
+  font-size: 0.72rem;
+  max-height: 100px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: #666;
+  font-family: 'Courier New', monospace;
+}
+
+.scan-manual-section {
+  margin-top: 0.6rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid #e0e0e0;
+}
+
 /* Form */
 .hidden {
   display: none !important;

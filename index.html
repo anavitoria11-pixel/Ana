@@ -39,22 +39,33 @@
       <button class="secondary small-btn" onclick="closeTextSearch()">Cancel</button>
     </div>
 
-    <!-- Scan Panel - shows OCR results from screenshot -->
+    <!-- Scan Panel - AI-powered place extraction from images -->
     <div id="scan-panel" class="hidden">
       <h3 id="scan-title">Scanning image...</h3>
       <div id="scan-progress" class="scan-progress-bar">
         <div id="scan-progress-fill"></div>
       </div>
       <div id="scan-results" class="hidden">
-        <p class="scan-hint">We found text in your image. Edit the search below or tap a detected line to use it:</p>
-        <div id="scan-lines"></div>
-        <div class="search-row">
-          <input type="text" id="scan-search-input" placeholder="Place name to search...">
-          <button onclick="scanGeoSearch()">Find</button>
+        <!-- AI-detected places -->
+        <div id="scan-found-places"></div>
+
+        <!-- Raw text toggle -->
+        <button class="secondary small-btn" id="scan-raw-toggle" onclick="toggleRawText()">Show extracted text</button>
+        <div id="scan-raw-container" class="hidden">
+          <pre id="scan-raw-text"></pre>
         </div>
-        <div id="scan-geo-results"></div>
+
+        <!-- Manual search fallback -->
+        <div class="scan-manual-section">
+          <p class="scan-hint">Don't see what you're looking for? Search manually:</p>
+          <div class="search-row">
+            <input type="text" id="scan-search-input" placeholder="Type a place name...">
+            <button onclick="scanGeoSearch()">Find</button>
+          </div>
+          <div id="scan-geo-results"></div>
+        </div>
       </div>
-      <button class="secondary small-btn" onclick="closeScanPanel()">Cancel</button>
+      <button class="secondary small-btn" onclick="closeScanPanel()">Close</button>
     </div>
 
     <!-- Save Form -->

@@ -187,12 +187,166 @@ function selectGeoResult(lat, lng, displayName) {
 }
 
 // ============================================================
-// IMAGE SCAN - OCR text extraction from screenshots/images
+// IMAGE SCAN - OCR + AI interpretation to extract places
 // ============================================================
 
 function triggerPhotoUpload() {
   document.getElementById('photo-input').click();
 }
+
+// AI Text Interpreter - extracts place names from raw OCR text
+function extractPlaceCandidates(text) {
+  var lines = text.split('\n')
+    .map(function (l) { return l.trim(); })
+    .filter(function (l) { return l.length > 2; });
+
+  // Noise words that are unlikely to be place names
+  var noisePatterns = [
+    /^(menu|price|total|subtotal|tax|tip|receipt|order|qty|item|date|time|thank|welcome|enjoy|please|www\.|http|@|#\d)$/i,
+    /^\d+[\.\,]\d{2}$/, // prices like 12.99
+    /^\$[\d\.\,]+$/, // dollar amounts
+    /^\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}$/, // dates
+    /^\d{1,2}:\d{2}/, // times
+    /^tel|^phone|^fax|^email/i,
+    /^\d+$/, // just numbers
+    /^[^a-zA-Z]*$/, // no letters at all
+  ];
+
+  var candidates = [];
+  var seen = {};
+
+  lines.forEach(function (line) {
+    // Skip noise
+    for (var i = 0; i < noisePatterns.length; i++) {
+      if (noisePatterns[i].test(line)) return;
+    }
+
+    // Clean up OCR artifacts
+    var cleaned = line
+      .replace(/[|}{[\]\\]/g, '') // remove OCR artifacts
+      .replace(/\s{2,}/g, ' ')    // collapse spaces
+      .trim();
+
+    if (cleaned.length < 3 || cleaned.length > 120) return;
+
+    // Score this line as a potential place name
+    var score = scorePlaceCandidate(cleaned);
+    if (score > 0) {
+      var key = cleaned.toLowerCase();
+      if (!seen[key]) {
+        seen[key] = true;
+        candidates.push({ text: cleaned, score: score });
+      }
+    }
+  });
+
+  // Also try to extract multi-word proper nouns and addresses from longer text blocks
+  var fullText = lines.join(' ');
+  var addressPattern = /\d{1,5}\s+[A-Z][a-zA-Z\s]+(?:St|Street|Ave|Avenue|Blvd|Boulevard|Rd|Road|Dr|Drive|Ln|Lane|Way|Pl|Place|Ct|Court)\.?(?:\s*,?\s*[A-Z][a-zA-Z\s]+)?/g;
+  var match;
+  while ((match = addressPattern.exec(fullText)) !== null) {
+    var addr = match[0].trim();
+    var addrKey = addr.toLowerCase();
+    if (!seen[addrKey]) {
+      seen[addrKey] = true;
+      candidates.push({ text: addr, score: 8 });
+    }
+  }
+
+  // Sort by score (highest first)
+  candidates.sort(function (a, b) { return b.score - a.score; });
+
+  // Return top candidates (limit to prevent too many API calls)
+  return candidates.slice(0, 10);
+}
+
+function scorePlaceCandidate(text) {
+  var score = 0;
+
+  // Starts with capital letter (proper noun)
+  if (/^[A-Z]/.test(text)) score += 2;
+
+  // Contains multiple capitalized words (likely a place name)
+  var capsWords = text.match(/[A-Z][a-zA-Z]+/g);
+  if (capsWords && capsWords.length >= 2) score += 2;
+
+  // Contains address-like patterns
+  if (/\d{1,5}\s+[A-Z]/.test(text)) score += 3;
+
+  // Contains location keywords
+  if (/\b(restaurant|cafe|bar|hotel|park|museum|church|theater|theatre|market|plaza|square|beach|lake|mountain|bridge|station|airport|hospital|university|school|library|store|shop|mall|garden|temple|palace|castle|tower|port|harbor|harbour)\b/i.test(text)) score += 4;
+
+  // Contains street/address suffixes
+  if (/\b(st|street|ave|avenue|blvd|boulevard|rd|road|dr|drive|ln|lane|way|pl|place|ct|court|hwy|highway)\b\.?\s/i.test(text)) score += 3;
+
+  // Contains city/country indicators
+  if (/\b(city|town|village|district|borough|county|state|province)\b/i.test(text)) score += 2;
+
+  // Has a reasonable length for a place name (3-60 chars)
+  if (text.length >= 5 && text.length <= 60) score += 1;
+
+  // Penalize things that look like UI elements or generic text
+  if (/\b(click|tap|swipe|login|sign|password|email|subscribe|follow|share|like|comment|download|upload|settings|profile|account|cancel|confirm|ok|yes|no)\b/i.test(text)) score -= 5;
+
+  // Penalize very long strings (probably paragraphs, not place names)
+  if (text.length > 80) score -= 3;
+
+  // Penalize all-caps (usually headers/labels, not place names)
+  if (text === text.toUpperCase() && text.length > 10) score -= 1;
+
+  return score;
+}
+
+// Geocode a single candidate, returns a promise
+function geocodeCandidate(candidate) {
+  return fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&q=' + encodeURIComponent(candidate.text))
+    .then(function (res) { return res.json(); })
+    .then(function (data) {
+      if (data && data.length > 0) {
+        return {
+          query: candidate.text,
+          score: candidate.score,
+          lat: parseFloat(data[0].lat),
+          lng: parseFloat(data[0].lon),
+          displayName: data[0].display_name,
+          name: data[0].display_name.split(',')[0],
+          address: data[0].display_name.split(',').slice(1, 4).join(',').trim()
+        };
+      }
+      return null;
+    })
+    .catch(function () { return null; });
+}
+
+// Stagger requests to respect Nominatim rate limits (1 req/sec)
+function geocodeCandidatesSequentially(candidates) {
+  var results = [];
+  var index = 0;
+
+  return new Promise(function (resolve) {
+    function next() {
+      if (index >= candidates.length) {
+        resolve(results);
+        return;
+      }
+      var candidate = candidates[index];
+      index++;
+
+      geocodeCandidate(candidate).then(function (result) {
+        if (result) {
+          results.push(result);
+          // Update UI as results come in
+          renderScanFoundPlaces(results);
+        }
+        // 1.1 second delay for Nominatim rate limit
+        setTimeout(next, 1100);
+      });
+    }
+    next();
+  });
+}
+
+var scanFoundPlaces = [];
 
 document.getElementById('photo-input').addEventListener('change', function (e) {
   var file = e.target.files[0];
@@ -203,22 +357,23 @@ document.getElementById('photo-input').addEventListener('change', function (e) {
   var progressFill = document.getElementById('scan-progress-fill');
   var resultsDiv = document.getElementById('scan-results');
 
-  // Show panel, hide previous results
+  // Show panel, reset state
   panel.classList.remove('hidden');
   resultsDiv.classList.add('hidden');
   title.textContent = 'Scanning image for text...';
   progressFill.style.width = '10%';
   document.getElementById('scan-progress').classList.remove('hidden');
+  scanFoundPlaces = [];
 
   // Use Tesseract.js to extract text from image
   Tesseract.recognize(file, 'eng+spa+fra+por+ita+deu', {
     logger: function (m) {
       if (m.status === 'recognizing text' && m.progress) {
-        progressFill.style.width = Math.round(10 + m.progress * 85) + '%';
+        progressFill.style.width = Math.round(10 + m.progress * 60) + '%';
       }
     }
   }).then(function (result) {
-    progressFill.style.width = '100%';
+    progressFill.style.width = '75%';
     var text = result.data.text || '';
 
     if (!text.trim()) {
@@ -229,36 +384,40 @@ document.getElementById('photo-input').addEventListener('change', function (e) {
       return;
     }
 
-    title.textContent = 'Text found! Pick a place to search:';
-    document.getElementById('scan-progress').classList.add('hidden');
+    title.textContent = 'Analyzing text for places...';
+
+    // AI interpretation step: extract place candidates
+    var candidates = extractPlaceCandidates(text);
+
+    if (candidates.length === 0) {
+      title.textContent = 'No place names detected. Try manual search below.';
+      progressFill.style.width = '100%';
+      document.getElementById('scan-progress').classList.add('hidden');
+      resultsDiv.classList.remove('hidden');
+      document.getElementById('scan-found-places').innerHTML = '';
+      document.getElementById('scan-raw-text').textContent = text;
+      return;
+    }
+
+    title.textContent = 'Found ' + candidates.length + ' potential places. Looking them up...';
     resultsDiv.classList.remove('hidden');
+    document.getElementById('scan-found-places').innerHTML = '<div class="loading">Searching for locations...</div>';
+    document.getElementById('scan-raw-text').textContent = text;
 
-    // Split text into lines, filter out short/empty ones
-    var lines = text.split('\n')
-      .map(function (l) { return l.trim(); })
-      .filter(function (l) { return l.length > 2; });
+    // Geocode all candidates
+    geocodeCandidatesSequentially(candidates).then(function (foundPlaces) {
+      progressFill.style.width = '100%';
+      document.getElementById('scan-progress').classList.add('hidden');
+      scanFoundPlaces = foundPlaces;
 
-    var linesDiv = document.getElementById('scan-lines');
-    linesDiv.innerHTML = '';
-
-    // Pre-fill the search input with the best guess (longest meaningful line)
-    var bestLine = lines.reduce(function (best, line) {
-      return line.length > best.length ? line : best;
-    }, '');
-    document.getElementById('scan-search-input').value = bestLine;
-
-    lines.forEach(function (line) {
-      var div = document.createElement('div');
-      div.className = 'scan-line';
-      div.textContent = line;
-      div.onclick = function () {
-        document.getElementById('scan-search-input').value = line;
-        document.getElementById('scan-search-input').focus();
-      };
-      linesDiv.appendChild(div);
+      if (foundPlaces.length === 0) {
+        title.textContent = 'No locations found. Try manual search below.';
+        document.getElementById('scan-found-places').innerHTML = '<div class="loading">No matching locations. Try editing text and searching manually.</div>';
+      } else {
+        title.textContent = foundPlaces.length + ' place' + (foundPlaces.length > 1 ? 's' : '') + ' found!';
+        renderScanFoundPlaces(foundPlaces);
+      }
     });
-
-    document.getElementById('scan-geo-results').innerHTML = '';
   }).catch(function () {
     title.textContent = 'Failed to scan image. Try a clearer screenshot.';
     document.getElementById('scan-progress').classList.add('hidden');
@@ -268,7 +427,108 @@ document.getElementById('photo-input').addEventListener('change', function (e) {
   e.target.value = '';
 });
 
-// Search from the scan panel
+function renderScanFoundPlaces(foundPlaces) {
+  var container = document.getElementById('scan-found-places');
+  container.innerHTML = '';
+
+  if (foundPlaces.length > 1) {
+    var addAllBtn = document.createElement('button');
+    addAllBtn.className = 'scan-add-all-btn';
+    addAllBtn.textContent = 'Add All ' + foundPlaces.length + ' Places';
+    addAllBtn.onclick = function () {
+      addAllScanPlaces();
+    };
+    container.appendChild(addAllBtn);
+  }
+
+  foundPlaces.forEach(function (place, index) {
+    var div = document.createElement('div');
+    div.className = 'scan-place-item';
+    div.setAttribute('data-index', index);
+
+    div.innerHTML = '<div class="scan-place-info">'
+      + '<div class="scan-place-name">' + escapeHTML(place.name) + '</div>'
+      + '<div class="scan-place-address">' + escapeHTML(place.address) + '</div>'
+      + '<div class="scan-place-query">Matched: "' + escapeHTML(place.query) + '"</div>'
+      + '</div>'
+      + '<button class="scan-add-btn" data-index="' + index + '">Add</button>';
+
+    div.querySelector('.scan-add-btn').onclick = function (e) {
+      e.stopPropagation();
+      addScanPlace(index);
+    };
+
+    // Click the row to preview on map
+    div.onclick = function () {
+      map.setView([place.lat, place.lng], 15);
+    };
+
+    container.appendChild(div);
+  });
+}
+
+function addScanPlace(index) {
+  var place = scanFoundPlaces[index];
+  if (!place) return;
+
+  // Check if already added
+  var btn = document.querySelector('.scan-add-btn[data-index="' + index + '"]');
+  if (btn && btn.disabled) return;
+
+  var newPlace = {
+    id: Date.now().toString(36) + Math.random().toString(36).slice(2, 7),
+    name: place.name,
+    description: 'Scanned from image',
+    category: 'default',
+    tags: ['scanned'],
+    lat: place.lat,
+    lng: place.lng,
+    city: '',
+    createdAt: new Date().toISOString(),
+  };
+
+  places.push(newPlace);
+  persistPlaces();
+  addMarkerToMap(newPlace);
+
+  // Reverse geocode for city
+  reverseGeocode(newPlace.lat, newPlace.lng, function (city) {
+    if (city) {
+      newPlace.city = city;
+      persistPlaces();
+      if (markers[newPlace.id]) {
+        markers[newPlace.id].setPopupContent(buildPopupHTML(newPlace));
+      }
+      renderPlacesList();
+      renderTagFilters();
+    }
+  });
+
+  renderPlacesList();
+  renderTagFilters();
+
+  // Update button to show added
+  if (btn) {
+    btn.textContent = 'Added';
+    btn.disabled = true;
+    btn.classList.add('scan-btn-added');
+  }
+}
+
+function addAllScanPlaces() {
+  scanFoundPlaces.forEach(function (_, index) {
+    addScanPlace(index);
+  });
+
+  var addAllBtn = document.querySelector('.scan-add-all-btn');
+  if (addAllBtn) {
+    addAllBtn.textContent = 'All Places Added!';
+    addAllBtn.disabled = true;
+    addAllBtn.classList.add('scan-btn-added');
+  }
+}
+
+// Manual search from the scan panel (fallback)
 function scanGeoSearch() {
   var query = document.getElementById('scan-search-input').value.trim();
   if (!query) return;
@@ -319,6 +579,19 @@ document.getElementById('scan-search-input').addEventListener('keydown', functio
 
 function closeScanPanel() {
   document.getElementById('scan-panel').classList.add('hidden');
+}
+
+// Toggle raw OCR text visibility
+function toggleRawText() {
+  var container = document.getElementById('scan-raw-container');
+  var btn = document.getElementById('scan-raw-toggle');
+  if (container.classList.contains('hidden')) {
+    container.classList.remove('hidden');
+    btn.textContent = 'Hide extracted text';
+  } else {
+    container.classList.add('hidden');
+    btn.textContent = 'Show extracted text';
+  }
 }
 
 // ============================================================
