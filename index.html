@@ -3,90 +3,343 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Interactive Quiz App</title>
+  <title>TripPlanner - Plan Your Adventures</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <div class="container">
-    <h1>Interactive Quiz App</h1>
-
-    <!-- Mode Selection -->
-    <div id="menu" class="card">
-      <h2>What would you like to do?</h2>
-      <div class="menu-buttons">
-        <button onclick="showCreateMode()">Create a Quiz</button>
-        <button onclick="showTakeMode()" id="btn-take-quiz" disabled>Take the Quiz</button>
+  <!-- Sidebar -->
+  <aside id="sidebar">
+    <!-- Trip Selector Header -->
+    <div class="sidebar-header">
+      <div class="header-row">
+        <h1 id="app-title">TripPlanner</h1>
+        <button class="icon-btn" id="trips-menu-btn" onclick="toggleTripsMenu()" title="My Trips">
+          <span class="hamburger-icon">&#9776;</span>
+        </button>
       </div>
-      <p id="quiz-status" class="status-text"></p>
+      <div id="current-trip-info" class="hidden">
+        <div class="trip-dates" id="trip-dates-display"></div>
+        <div class="trip-destination" id="trip-dest-display"></div>
+      </div>
     </div>
 
-    <!-- Quiz Creation -->
-    <div id="create-mode" class="card hidden">
-      <h2>Create Your Quiz</h2>
-      <p class="subtitle">Add questions with multiple-choice answers. Mark the correct one.</p>
+    <!-- Trips Menu (slide-over) -->
+    <div id="trips-menu" class="hidden">
+      <div class="trips-menu-header">
+        <h3>My Trips</h3>
+        <button class="icon-btn" onclick="toggleTripsMenu()">&#10005;</button>
+      </div>
+      <div id="trips-list"></div>
+      <button class="new-trip-btn" onclick="showNewTripForm()">+ New Trip</button>
+    </div>
 
+    <!-- New/Edit Trip Form -->
+    <div id="trip-form" class="hidden">
+      <h3 id="trip-form-title">New Trip</h3>
       <div class="form-group">
-        <label for="question-input">Question</label>
-        <input type="text" id="question-input" placeholder="Type your question here...">
+        <label for="trip-name">Trip Name</label>
+        <input type="text" id="trip-name" placeholder="e.g. Summer in Italy">
       </div>
-
-      <div id="options-container">
-        <label>Answer Options</label>
-        <div class="option-row">
-          <input type="radio" name="correct" value="0" checked>
-          <input type="text" class="option-input" placeholder="Option 1">
+      <div class="form-group">
+        <label for="trip-destination">Destination</label>
+        <input type="text" id="trip-destination" placeholder="e.g. Rome, Italy">
+      </div>
+      <div class="form-row">
+        <div class="form-group half">
+          <label for="trip-start">Start Date</label>
+          <input type="date" id="trip-start">
         </div>
-        <div class="option-row">
-          <input type="radio" name="correct" value="1">
-          <input type="text" class="option-input" placeholder="Option 2">
-        </div>
-        <div class="option-row">
-          <input type="radio" name="correct" value="2">
-          <input type="text" class="option-input" placeholder="Option 3">
-        </div>
-        <div class="option-row">
-          <input type="radio" name="correct" value="3">
-          <input type="text" class="option-input" placeholder="Option 4">
+        <div class="form-group half">
+          <label for="trip-end">End Date</label>
+          <input type="date" id="trip-end">
         </div>
       </div>
-      <p class="hint">Select the radio button next to the correct answer.</p>
-
+      <div class="form-group">
+        <label for="trip-budget">Total Budget</label>
+        <div class="input-with-prefix">
+          <span class="input-prefix">$</span>
+          <input type="number" id="trip-budget" placeholder="0.00" step="0.01" min="0">
+        </div>
+      </div>
+      <div class="form-group">
+        <label for="trip-notes">Notes</label>
+        <textarea id="trip-notes" rows="2" placeholder="Travel tips, reminders..."></textarea>
+      </div>
       <div class="form-actions">
-        <button onclick="addQuestion()">Add Question</button>
-        <button onclick="finishCreating()" class="secondary">Done - Back to Menu</button>
-      </div>
-
-      <div id="questions-list" class="hidden">
-        <h3>Questions Added:</h3>
-        <ul id="questions-ul"></ul>
+        <button onclick="saveTrip()">Save Trip</button>
+        <button class="secondary" onclick="cancelTripForm()">Cancel</button>
       </div>
     </div>
 
-    <!-- Quiz Taking -->
-    <div id="take-mode" class="card hidden">
-      <div id="quiz-area">
-        <div class="progress-bar">
-          <div id="progress-fill"></div>
+    <!-- Tab Bar -->
+    <div id="tab-bar" class="hidden">
+      <button class="tab active" data-tab="itinerary" onclick="switchTab('itinerary')">Itinerary</button>
+      <button class="tab" data-tab="places" onclick="switchTab('places')">Places</button>
+      <button class="tab" data-tab="budget" onclick="switchTab('budget')">Budget</button>
+      <button class="tab" data-tab="notes" onclick="switchTab('notes')">Notes</button>
+    </div>
+
+    <!-- ITINERARY TAB -->
+    <div id="tab-itinerary" class="tab-content hidden">
+      <div class="tab-toolbar">
+        <button class="toolbar-btn" onclick="showAddPlaceOptions()">+ Add Place</button>
+        <button class="toolbar-btn secondary" onclick="optimizeDay()">Optimize Route</button>
+      </div>
+      <div id="itinerary-days"></div>
+      <div id="unassigned-section">
+        <div class="day-header unassigned-header" onclick="toggleUnassigned()">
+          <span>Unassigned Places</span>
+          <span class="day-chevron" id="unassigned-chevron">&#9660;</span>
         </div>
-        <p id="question-counter" class="subtitle"></p>
-        <h2 id="quiz-question"></h2>
-        <div id="quiz-options"></div>
-        <div id="feedback" class="hidden"></div>
-        <button id="next-btn" class="hidden" onclick="nextQuestion()">Next Question</button>
+        <div id="unassigned-places"></div>
+      </div>
+    </div>
+
+    <!-- PLACES TAB -->
+    <div id="tab-places" class="tab-content hidden">
+      <div class="tab-toolbar">
+        <div class="add-methods-row">
+          <button onclick="showTextSearch()" class="toolbar-btn" title="Search for a place">
+            &#128269; Find Place
+          </button>
+          <button onclick="triggerPhotoUpload()" class="toolbar-btn" title="Scan screenshot for places">
+            &#128247; Scan Image
+          </button>
+        </div>
+        <input type="file" id="photo-input" accept="image/*" class="hidden">
       </div>
 
-      <div id="results-area" class="hidden">
-        <h2>Quiz Complete!</h2>
-        <div id="score-display"></div>
-        <div id="results-details"></div>
-        <div class="form-actions">
-          <button onclick="retakeQuiz()">Retake Quiz</button>
-          <button onclick="backToMenu()" class="secondary">Back to Menu</button>
+      <!-- Text Search Panel -->
+      <div id="text-search-panel" class="hidden">
+        <h3>Find a place</h3>
+        <div class="search-row">
+          <input type="text" id="geo-search-input" placeholder="e.g. Eiffel Tower, Paris">
+          <button onclick="geoSearch()" id="geo-search-btn">Go</button>
         </div>
+        <div id="geo-results"></div>
+        <button class="secondary small-btn" onclick="closeTextSearch()">Cancel</button>
+      </div>
+
+      <!-- Context prompt before scan -->
+      <div id="scan-context-prompt" class="hidden">
+        <h3>Add context <span class="optional-label">(optional)</span></h3>
+        <p class="scan-hint">Where are these places? This helps find the right locations.</p>
+        <input type="text" id="scan-context-input" placeholder="e.g. Dublin, Tokyo, Brooklyn...">
+        <div class="scan-context-actions">
+          <button onclick="startScanWithContext()">Scan Image</button>
+          <button class="secondary" onclick="startScanWithContext()">Skip</button>
+        </div>
+      </div>
+
+      <!-- Scan Panel -->
+      <div id="scan-panel" class="hidden">
+        <h3 id="scan-title">Scanning image...</h3>
+        <div id="scan-progress" class="scan-progress-bar">
+          <div id="scan-progress-fill"></div>
+        </div>
+        <div id="scan-results" class="hidden">
+          <div id="scan-found-places"></div>
+          <button class="secondary small-btn" id="scan-raw-toggle" onclick="toggleRawText()">Show extracted text</button>
+          <div id="scan-raw-container" class="hidden">
+            <pre id="scan-raw-text"></pre>
+          </div>
+          <div class="scan-manual-section">
+            <p class="scan-hint">Don't see what you're looking for?</p>
+            <div class="search-row">
+              <input type="text" id="scan-search-input" placeholder="Type a place name...">
+              <button onclick="scanGeoSearch()">Find</button>
+            </div>
+            <div id="scan-geo-results"></div>
+          </div>
+        </div>
+        <button class="secondary small-btn" onclick="closeScanPanel()">Close</button>
+      </div>
+
+      <!-- Save Place Form -->
+      <div id="place-form" class="hidden">
+        <h3 id="form-title">Save this place</h3>
+        <div id="form-location-preview" class="hidden">
+          <span id="form-location-name"></span>
+        </div>
+        <div class="form-group">
+          <label for="place-name">Name</label>
+          <input type="text" id="place-name" placeholder="e.g. Colosseum">
+        </div>
+        <div class="form-group">
+          <label for="place-desc">Description</label>
+          <textarea id="place-desc" rows="2" placeholder="Add a note..."></textarea>
+        </div>
+        <div class="form-group">
+          <label for="place-category">Category</label>
+          <select id="place-category">
+            <option value="attraction">Attraction</option>
+            <option value="food">Food & Drink</option>
+            <option value="hotel">Hotel / Stay</option>
+            <option value="activity">Activity</option>
+            <option value="shopping">Shopping</option>
+            <option value="transport">Transport</option>
+            <option value="nature">Nature</option>
+            <option value="nightlife">Nightlife</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <div class="form-group half">
+            <label for="place-cost">Est. Cost</label>
+            <div class="input-with-prefix">
+              <span class="input-prefix">$</span>
+              <input type="number" id="place-cost" placeholder="0" step="0.01" min="0">
+            </div>
+          </div>
+          <div class="form-group half">
+            <label for="place-duration">Duration</label>
+            <select id="place-duration">
+              <option value="30">30 min</option>
+              <option value="60" selected>1 hour</option>
+              <option value="90">1.5 hours</option>
+              <option value="120">2 hours</option>
+              <option value="180">3 hours</option>
+              <option value="240">Half day</option>
+              <option value="480">Full day</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="place-day">Assign to Day</label>
+          <select id="place-day">
+            <option value="">Unassigned</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="place-tags">Tags</label>
+          <input type="text" id="place-tags" placeholder="e.g. must-see, romantic (comma separated)">
+        </div>
+        <div class="form-actions">
+          <button id="btn-save" onclick="savePlace()">Save Place</button>
+          <button id="btn-cancel" class="secondary" onclick="cancelForm()">Cancel</button>
+        </div>
+      </div>
+
+      <!-- Filter -->
+      <div id="filter-bar">
+        <input type="text" id="search-input" placeholder="Search places...">
+        <div id="category-filters"></div>
+      </div>
+
+      <!-- All Places List -->
+      <div id="places-list">
+        <p id="empty-message" class="empty-msg">No places yet. Search or click the map to add!</p>
+      </div>
+    </div>
+
+    <!-- BUDGET TAB -->
+    <div id="tab-budget" class="tab-content hidden">
+      <div class="budget-overview">
+        <div class="budget-total-card">
+          <div class="budget-label">Trip Budget</div>
+          <div class="budget-amount" id="budget-total">$0</div>
+        </div>
+        <div class="budget-stats">
+          <div class="budget-stat">
+            <div class="stat-label">Spent</div>
+            <div class="stat-value" id="budget-spent">$0</div>
+          </div>
+          <div class="budget-stat">
+            <div class="stat-label">Remaining</div>
+            <div class="stat-value" id="budget-remaining">$0</div>
+          </div>
+        </div>
+        <div class="budget-progress-bar">
+          <div class="budget-progress-fill" id="budget-progress-fill"></div>
+        </div>
+      </div>
+      <div class="budget-breakdown">
+        <h4>By Category</h4>
+        <div id="budget-by-category"></div>
+      </div>
+      <div class="budget-breakdown">
+        <h4>By Day</h4>
+        <div id="budget-by-day"></div>
+      </div>
+      <div class="budget-add-section">
+        <h4>Add Expense</h4>
+        <div class="form-group">
+          <input type="text" id="expense-name" placeholder="Expense description">
+        </div>
+        <div class="form-row">
+          <div class="form-group half">
+            <div class="input-with-prefix">
+              <span class="input-prefix">$</span>
+              <input type="number" id="expense-amount" placeholder="0.00" step="0.01" min="0">
+            </div>
+          </div>
+          <div class="form-group half">
+            <select id="expense-category">
+              <option value="food">Food & Drink</option>
+              <option value="transport">Transport</option>
+              <option value="hotel">Accommodation</option>
+              <option value="attraction">Attractions</option>
+              <option value="shopping">Shopping</option>
+              <option value="activity">Activities</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
+        </div>
+        <button onclick="addExpense()" class="full-width-btn">Add Expense</button>
+      </div>
+      <div id="expenses-list"></div>
+    </div>
+
+    <!-- NOTES TAB -->
+    <div id="tab-notes" class="tab-content hidden">
+      <div class="notes-container">
+        <textarea id="trip-notes-editor" placeholder="Write your travel notes, tips, packing list, bookings info..."></textarea>
+        <button onclick="saveTripNotes()" class="full-width-btn" style="margin-top: 0.5rem;">Save Notes</button>
+      </div>
+      <div class="notes-section">
+        <h4>Quick Links & Bookings</h4>
+        <div id="bookings-list"></div>
+        <div class="form-row" style="margin-top: 0.5rem;">
+          <div class="form-group" style="flex:2">
+            <input type="text" id="booking-name" placeholder="e.g. Flight confirmation">
+          </div>
+          <div class="form-group" style="flex:3">
+            <input type="text" id="booking-link" placeholder="URL or reference number">
+          </div>
+        </div>
+        <button onclick="addBooking()" class="secondary full-width-btn">Add Link</button>
+      </div>
+    </div>
+
+    <!-- Sidebar Footer -->
+    <div class="sidebar-footer" id="sidebar-footer">
+      <button class="secondary" onclick="exportTrip()">Export</button>
+      <button class="secondary" onclick="shareTrip()">Share</button>
+    </div>
+  </aside>
+
+  <!-- Map -->
+  <div id="map"></div>
+
+  <!-- Mobile toggle -->
+  <button id="sidebar-toggle" onclick="toggleSidebar()">&#9776;</button>
+
+  <!-- Add Place Modal (triggered from itinerary) -->
+  <div id="add-place-modal" class="modal hidden">
+    <div class="modal-content">
+      <h3>Add a Place</h3>
+      <p>How would you like to add?</p>
+      <div class="modal-options">
+        <button onclick="closeModal(); showTextSearch(); switchTab('places');">Search by Name</button>
+        <button onclick="closeModal(); triggerPhotoUpload(); switchTab('places');">Scan an Image</button>
+        <button onclick="closeModal();" class="secondary">Click on Map</button>
       </div>
     </div>
   </div>
 
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
